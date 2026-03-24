@@ -198,10 +198,10 @@ public class Fido2Service : IFido2Service
             OriginalOptions = options,
             StoredPublicKey = credential.PublicKey,
             StoredSignatureCounter = credential.SignCount,
-            IsUserHandleOwnerOfCredentialIdCallback = async (args, cancellationToken) =>
+            IsUserHandleOwnerOfCredentialIdCallback = (args, cancellationToken) =>
             {
                 // Verify the credential belongs to the user handle
-                return credential.Username == System.Text.Encoding.UTF8.GetString(args.UserHandle);
+                return Task.FromResult(credential.Username == System.Text.Encoding.UTF8.GetString(args.UserHandle));
             }
         });
         
