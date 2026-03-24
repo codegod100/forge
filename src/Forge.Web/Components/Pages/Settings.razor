@@ -54,9 +54,13 @@
         <h2>Passkeys</h2>
         <p class="auth-copy">Register passkeys for passwordless authentication. Passkeys are stored on your device and synced across your devices via iCloud Keychain, Google Password Manager, or other password managers.</p>
         
-        @if (!webauthnAvailable)
+        @if (!webauthnAvailable.HasValue)
         {
-            <p class="auth-warning">WebAuthn is not available in this browser. Passkeys require a modern browser with WebAuthn support.</p>
+            <p class="auth-warning">Checking WebAuthn availability...</p>
+        }
+        else if (!webauthnAvailable.Value)
+        {
+            <p class="auth-warning">WebAuthn is not available. Passkeys require HTTPS (or localhost) and a modern browser.</p>
         }
         else
         {
@@ -124,7 +128,7 @@
     private bool Error => !string.IsNullOrEmpty(ErrorValue);
     private string ErrorMessage => ErrorValue ?? "An error occurred.";
 
-    private bool webauthnAvailable = false;
+    private bool? webauthnAvailable = null; // null = not checked yet
     private bool showRegisterForm = false;
     private string deviceName = string.Empty;
     private string? passkeyError;

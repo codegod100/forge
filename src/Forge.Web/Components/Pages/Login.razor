@@ -71,15 +71,16 @@
         string.Equals(ErrorValue, "true", StringComparison.OrdinalIgnoreCase)
         || string.Equals(ErrorValue, "1", StringComparison.Ordinal);
 
-    private bool passkeyDisabled = false;
+    private bool passkeyDisabled = true; // Disabled until we confirm available
     private string? passkeyError;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            // Check if WebAuthn is available
-            passkeyDisabled = !await JS.InvokeAsync<bool>("forge.webauthn.isAvailable");
+            // Check if WebAuthn is available (requires HTTPS or localhost)
+            var available = await JS.InvokeAsync<bool>("forge.webauthn.isAvailable");
+            passkeyDisabled = !available;
             StateHasChanged();
         }
     }
