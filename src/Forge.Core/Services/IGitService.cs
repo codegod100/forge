@@ -28,9 +28,9 @@ public interface IGitService
     Task<BranchInfo?> GetDefaultBranchAsync(Repository repository);
     
     /// <summary>
-    /// Get tree entries at a path in a branch
+    /// Get tree entries at a path in a branch. Returns null if branch/path not found.
     /// </summary>
-    Task<IEnumerable<TreeNode>> GetTreeAsync(Repository repository, string branch, string? path = null);
+    Task<IEnumerable<TreeNode>?> GetTreeAsync(Repository repository, string branch, string? path = null);
     
     /// <summary>
     /// Get all files in a repository recursively
@@ -66,4 +66,9 @@ public interface IGitService
     /// Validate all repositories in database exist on disk, repair any missing
     /// </summary>
     Task<int> ValidateAndRepairRepositoriesAsync(IEnumerable<Repository> repositories);
+
+    /// <summary>
+    /// Get blame information for a file
+    /// </summary>
+    Task<IEnumerable<BlameLine>> GetBlameAsync(Repository repository, string branch, string path);
 }

@@ -1,3 +1,4 @@
+@page "/{Owner}/{Name}/tree/{Branch}"
 @page "/{Owner}/{Name}/tree/{Branch}/{*Path}"
 @inject IRepositoryService RepositoryService
 @inject IGitService GitService
@@ -17,19 +18,23 @@ else
     </div>
 
     <div class="breadcrumb">
-        <a href="/@repository.Owner/@repository.Name/tree/@Branch">root</a>
-        @foreach (var segment in GetPathSegments())
+        <a href="/@repository.Owner/@repository.Name/tree/@Branch">@Branch</a>
+        @foreach (var segment in breadcrumbSegments)
         {
             <span> / </span>
             <a href="/@repository.Owner/@repository.Name/tree/@Branch/@segment.Path">@segment.Name</a>
         }
     </div>
 
-    @if (treeNodes == null)
+    @if (loading)
     {
         <p>Loading...</p>
     }
-    else if (!treeNodes.Any())
+    else if (error != null)
+    {
+        <p class="empty-state">@error</p>
+    }
+    else if (treeNodes == null || !treeNodes.Any())
     {
         <p class="empty-state">Empty directory</p>
     }
@@ -81,29 +86,89 @@ else
 
     private Repository? repository;
     private IEnumerable<TreeNode>? treeNodes;
+    private bool loading = true;
+    private string? error;
+    private List<(string Path, string Name)> breadcrumbSegments = [];
+    private string? lastProcessedPath;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
-        repository = await RepositoryService.GetByOwnerAndNameAsync(Owner, Name);
-        if (repository != null)
+        // Always recompute breadcrumbs from current Path parameter
+        breadcrumbSegments = ComputeBreadcrumbSegments(Path);
+        
+        // Only reload if path actually changed
+        if (lastProcessedPath != Path)
         {
-            treeNodes = await GitService.GetTreeAsync(repository, Branch, Path);
+            lastProcessedPath = Path;
+            await LoadAsync();
         }
     }
 
-    private IEnumerable<(string Path, string Name)> GetPathSegments()
+    private async Task LoadAsync()
     {
-        if (string.IsNullOrEmpty(Path))
-            return Enumerable.Empty<(string, string)>();
+        loading = true;
+        error = null;
         
-        var segments = Path.Split('/', '\\', StringSplitOptions.RemoveEmptyEntries);
-        var result = new List<(string, string)>();
-        var path = "";
+        if (repository == null || repository.Owner != Owner || repository.Name != Name)
+        {
+            repository = await RepositoryService.GetByOwnerAndNameAsync(Owner, Name);
+        }
+        
+        if (repository == null)
+        {
+            loading = false;
+            return;
+        }
+
+        if (!GitService.RepositoryExists(repository))
+        {
+            error = "Repository not found on disk";
+            loading = false;
+            return;
+        }
+
+        var branches = await GitService.GetBranchesAsync(repository);
+        var branchExists = branches.Any(b => b.Name == Branch);
+
+        if (!branchExists)
+        {
+            if (!branches.Any())
+            {
+                error = "This repository is empty. Push some code to get started!";
+            }
+            else
+            {
+                var branchList = string.Join(", ", branches.Select(b => b.Name));
+                error = $"Branch '{Branch}' not found. Available branches: {branchList}";
+            }
+        }
+        else
+        {
+            treeNodes = await GitService.GetTreeAsync(repository, Branch, Path);
+            if (treeNodes == null && !string.IsNullOrEmpty(Path))
+            {
+                error = $"Path '{Path}' not found in this branch";
+            }
+        }
+        
+        loading = false;
+    }
+
+    private static List<(string Path, string Name)> ComputeBreadcrumbSegments(string? path)
+    {
+        if (string.IsNullOrEmpty(path))
+            return [];
+        
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        var result = new List<(string Path, string Name)>();
+        var accumulated = "";
+        
         foreach (var segment in segments)
         {
-            path = string.IsNullOrEmpty(path) ? segment : $"{path}/{segment}";
-            result.Add((path, segment));
+            accumulated = string.IsNullOrEmpty(accumulated) ? segment : $"{accumulated}/{segment}";
+            result.Add((accumulated, segment));
         }
+        
         return result;
     }
 

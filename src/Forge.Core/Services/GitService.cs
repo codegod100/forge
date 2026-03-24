@@ -121,23 +121,23 @@ public class GitService : IGitService
         return await GetBranchAsync(repository, repository.DefaultBranch);
     }
 
-    public async Task<IEnumerable<TreeNode>> GetTreeAsync(Models.Repository repository, string branch, string? path = null)
+    public async Task<IEnumerable<TreeNode>?> GetTreeAsync(Models.Repository repository, string branch, string? path = null)
     {
         var fullPath = GetFullPath(repository);
         if (!Directory.Exists(fullPath))
-            return [];
+            return null;
         
         try
         {
             using var repo = new LibGit2SharpRepository(fullPath);
             
-            var gitBranch = repo.Branches[branch];
-            if (gitBranch == null)
-                return [];
+            var commit = ResolveCommitish(repo, branch);
+            if (commit == null)
+                return null;
             
-            var tree = gitBranch.Tip?.Tree;
+            var tree = commit.Tree;
             if (tree == null)
-                return [];
+                return null;
             
             if (!string.IsNullOrEmpty(path))
             {
@@ -148,7 +148,7 @@ public class GitService : IGitService
                     if (entry?.Target is Tree subTree)
                         tree = subTree;
                     else
-                        return [];
+                        return null; // Path not found or not a directory
                 }
             }
             
@@ -181,7 +181,7 @@ public class GitService : IGitService
         catch (LibGit2SharpException ex)
         {
             Console.WriteLine($"[Forge] Git error in GetTreeAsync: {ex.Message}");
-            return [];
+            return null;
         }
     }
 
@@ -195,16 +195,12 @@ public class GitService : IGitService
         {
             using var repo = new LibGit2SharpRepository(fullPath);
             
-            var gitBranch = repo.Branches[branch];
-            if (gitBranch == null)
-                return [];
-            
-            var tree = gitBranch.Tip?.Tree;
-            if (tree == null)
+            var commit = ResolveCommitish(repo, branch);
+            if (commit == null)
                 return [];
             
             var nodes = new List<TreeNode>();
-            CollectAllFiles(tree, "", nodes);
+            CollectAllFiles(commit.Tree, "", nodes);
             
             return await Task.FromResult(nodes.OrderBy(n => n.Path).ToList());
         }
@@ -250,11 +246,11 @@ public class GitService : IGitService
         
         using var repo = new LibGit2SharpRepository(fullPath);
         
-        var gitBranch = repo.Branches[branch];
-        if (gitBranch == null)
+        var commit = ResolveCommitish(repo, branch);
+        if (commit == null)
             return null;
         
-        var entry = gitBranch.Tip?[path];
+        var entry = commit[path];
         if (entry == null || entry.Target is not Blob blob)
             return null;
         
@@ -281,11 +277,11 @@ public class GitService : IGitService
         {
             using var repo = new LibGit2SharpRepository(fullPath);
             
-            var gitBranch = repo.Branches[branch];
-            if (gitBranch == null)
+            var commit = ResolveCommitish(repo, branch);
+            if (commit == null)
                 return [];
             
-            var commits = gitBranch.Commits
+            var commits = repo.Commits.QueryBy(new CommitFilter { IncludeReachableFrom = commit })
                 .Skip(skip)
                 .Take(take)
                 .Select(c => new CommitInfo
@@ -419,9 +415,91 @@ public class GitService : IGitService
         return Task.FromResult(repaired);
     }
 
+    public async Task<IEnumerable<BlameLine>> GetBlameAsync(Models.Repository repository, string branch, string path)
+    {
+        var fullPath = GetFullPath(repository);
+        if (!Directory.Exists(fullPath))
+            return [];
+        
+        try
+        {
+            using var repo = new LibGit2SharpRepository(fullPath);
+            
+            var commit = ResolveCommitish(repo, branch);
+            if (commit == null)
+                return [];
+            
+            var entry = commit[path];
+            if (entry == null || entry.Target is not Blob blob)
+                return [];
+            
+            var blame = repo.Blame(path, new BlameOptions { StartingAt = commit });
+            var content = blob.GetContentText();
+            var lines = content.Split('\n');
+            
+            var result = new List<BlameLine>();
+            
+            for (int i = 0; i < lines.Length; i++)
+            {
+                var lineNum = i + 1;
+                var lineContent = lines[i];
+                
+                // Find the blame hunk for this line
+                var hunk = blame.FirstOrDefault(h =>
+                    h.FinalStartLineNumber <= lineNum &&
+                    lineNum < h.FinalStartLineNumber + h.LineCount);
+                
+                if (hunk != null)
+                {
+                    var blamedCommit = hunk.FinalCommit;
+                    result.Add(new BlameLine
+                    {
+                        LineNumber = lineNum,
+                        Content = lineContent,
+                        CommitSha = blamedCommit.Sha,
+                        Author = hunk.FinalSignature.Name,
+                        Date = hunk.FinalSignature.When.UtcDateTime,
+                        Message = blamedCommit.MessageShort
+                    });
+                }
+                else
+                {
+                    // Fallback for lines without blame info
+                    result.Add(new BlameLine
+                    {
+                        LineNumber = lineNum,
+                        Content = lineContent,
+                        CommitSha = commit.Sha,
+                        Author = commit.Author.Name,
+                        Date = commit.Author.When.UtcDateTime,
+                        Message = commit.MessageShort
+                    });
+                }
+            }
+            
+            return await Task.FromResult(result);
+        }
+        catch (LibGit2SharpException ex)
+        {
+            Console.WriteLine($"[Forge] Git error in GetBlameAsync: {ex.Message}");
+            return [];
+        }
+    }
+
     private string GetFullPath(Models.Repository repository)
     {
         return System.IO.Path.Combine(_repositoriesRoot, repository.Path);
+    }
+
+    private static LibGit2Sharp.Commit? ResolveCommitish(LibGit2SharpRepository repo, string revision)
+    {
+        var branch = repo.Branches[revision];
+        if (branch?.Tip != null)
+        {
+            return branch.Tip;
+        }
+
+        return repo.Lookup<LibGit2Sharp.Commit>(revision);
     }
 
     private static TreeEntryType MapEntryType(Mode mode)

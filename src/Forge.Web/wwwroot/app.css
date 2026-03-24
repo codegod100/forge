@@ -318,6 +318,16 @@ a:hover {
     line-height: 1.6;
 }
 
+.file-content.syntax-pending {
+    opacity: 0.45;
+    transition: opacity 140ms ease;
+}
+
+.file-content.syntax-ready {
+    opacity: 1;
+    transition: opacity 180ms ease;
+}
+
 .file-content code[class*="language-"],
 .file-content pre[class*="language-"] {
     font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
@@ -880,4 +890,212 @@ mark {
     color: inherit;
     padding: 0.1em 0.2em;
     border-radius: 2px;
+}
+
+/* File Actions */
+.file-actions {
+    margin-bottom: 0.5rem;
+    display: flex;
+    gap: 0.5rem;
+}
+
+.file-actions .btn-sm {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-outline-secondary {
+    background: transparent;
+    color: #8b949e;
+    border: 1px solid #30363d;
+}
+
+.btn-outline-secondary:hover {
+    background: #21262d;
+    color: #f0f6fc;
+}
+
+.btn-outline-secondary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Blame View */
+.blame-view {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    overflow: hidden;
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+    font-size: 0.8125rem;
+}
+
+.blame-group {
+    display: flex;
+    border-bottom: 1px solid #21262d;
+}
+
+.blame-group:last-child {
+    border-bottom: none;
+}
+
+.blame-info {
+    background: #0d1117;
+    padding: 0.5rem 0.75rem;
+    width: 220px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    border-right: 1px solid #30363d;
+    border-left: 3px solid #30363d;
+    overflow: hidden;
+    align-items: flex-start;
+}
+
+/* Age-based coloring */
+.blame-age-new {
+    border-left-color: #3fb950;  /* green - < 1 week */
+}
+
+.blame-age-recent {
+    border-left-color: #d29922;  /* yellow - < 1 month */
+}
+
+.blame-age-medium {
+    border-left-color: #db6d28;  /* orange - < 3 months */
+}
+
+.blame-age-old {
+    border-left-color: #58a6ff;  /* blue - < 1 year */
+}
+
+.blame-age-ancient {
+    border-left-color: #484f58;  /* gray - > 1 year */
+}
+
+/* Blame Legend */
+.blame-legend {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.6875rem;
+    color: #8b949e;
+}
+
+.blame-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.blame-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+}
+
+.blame-legend-item.blame-age-new .blame-legend-dot {
+    background: #3fb950;
+}
+
+.blame-legend-item.blame-age-recent .blame-legend-dot {
+    background: #d29922;
+}
+
+.blame-legend-item.blame-age-medium .blame-legend-dot {
+    background: #db6d28;
+}
+
+.blame-legend-item.blame-age-old .blame-legend-dot {
+    background: #58a6ff;
+}
+
+.blame-legend-item.blame-age-ancient .blame-legend-dot {
+    background: #484f58;
+}
+
+.blame-sha {
+    color: #58a6ff;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.blame-sha:hover {
+    text-decoration: underline;
+}
+
+.blame-author {
+    color: #c9d1d9;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.blame-message {
+    color: #8b949e;
+    font-size: 0.6875rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    font-style: italic;
+}
+
+.blame-date {
+    color: #6e7681;
+    font-size: 0.625rem;
+}
+
+.blame-lines {
+    flex: 1;
+    overflow: hidden;
+}
+
+.blame-line {
+    display: flex;
+    padding: 0 0.75rem;
+    min-height: 1.5rem;
+    align-items: center;
+}
+
+.blame-line:hover {
+    background: rgba(56, 139, 253, 0.1);
+}
+
+.blame-line .line-number {
+    color: #484f58;
+    min-width: 2.5rem;
+    text-align: right;
+    margin-right: 1rem;
+    flex-shrink: 0;
+}
+
+.blame-line code {
+    background: transparent;
+    padding: 0;
+    color: #c9d1d9;
+    white-space: pre;
+    overflow-x: auto;
+    flex: 1;
+}
+
+/* Spinner */
+.spinner-border-sm {
+    width: 0.875rem;
+    height: 0.875rem;
+    border: 0.125em solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spinner-border .75s linear infinite;
+}
+
+@keyframes spinner-border {
+    to {
+        transform: rotate(360deg);
+    }
 }

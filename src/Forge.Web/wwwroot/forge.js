@@ -2,7 +2,22 @@ window.forge = window.forge || {};
 
 window.forge.highlightCodeBlocks = () => {
   if (window.Prism) {
-    window.Prism.highlightAll();
+    const blocks = document.querySelectorAll('.syntax-pending code[class*="language-"]');
+
+    if (blocks.length === 0) {
+      window.Prism.highlightAll();
+      return;
+    }
+
+    blocks.forEach((block) => {
+      window.Prism.highlightElement(block);
+
+      const container = block.closest('.syntax-pending');
+      if (container) {
+        container.classList.remove('syntax-pending');
+        container.classList.add('syntax-ready');
+      }
+    });
   }
 };
 

@@ -19,16 +19,16 @@ else
 {
     <div class="repo-header">
         <h1>
-            <a href="/@repo.Owner">@repo.Owner</a> / <strong>@repo.Name</strong>
+            <a href="/@repo.Owner">@repo.Owner</a> / <a href="/@repo.Owner/@repo.Name"><strong>@repo.Name</strong></a>
         </h1>
     </div>
 
     <div class="breadcrumb">
-        <a href="/@repo.Owner/@repo.Name/tree/@Branch">@repo.DefaultBranch</a>
-        @foreach (var part in pathParts.Take(pathParts.Length - 1))
+        <a href="/@repo.Owner/@repo.Name/tree/@Branch">@Branch</a>
+        @foreach (var segment in directorySegments)
         {
             <span>/</span>
-            <a href="/@repo.Owner/@repo.Name/tree/@Branch/@part">@part</a>
+            <a href="/@repo.Owner/@repo.Name/tree/@Branch/@segment.Path">@segment.Name</a>
         }
         <span>/</span>
         <strong>@System.IO.Path.GetFileName(Path)</strong>
@@ -46,7 +46,60 @@ else
     }
     else
     {
-        <pre class="file-content"><code class="@LanguageClass">@file.Content</code></pre>
+        <div class="file-actions">
+            <button class="btn btn-sm @(showBlame ? "btn-primary" : "btn-outline-secondary")" 
+                    @onclick="ToggleBlame" 
+                    disabled="@blameLoading">
+                @if (blameLoading)
+                {
+                    <span class="spinner-border spinner-border-sm" role="status"></span>
+                }
+                else
+                {
+                    <text>👁️ Blame</text>
+                }
+            </button>
+        </div>
+
+        @if (showBlame && blameGroups.Count > 0)
+        {
+            <div class="blame-legend">
+                <span class="blame-legend-item blame-age-new"><span class="blame-legend-dot"></span>&lt;1w</span>
+                <span class="blame-legend-item blame-age-recent"><span class="blame-legend-dot"></span>&lt;1mo</span>
+                <span class="blame-legend-item blame-age-medium"><span class="blame-legend-dot"></span>&lt;3mo</span>
+                <span class="blame-legend-item blame-age-old"><span class="blame-legend-dot"></span>&lt;1yr</span>
+                <span class="blame-legend-item blame-age-ancient"><span class="blame-legend-dot"></span>&gt;1yr</span>
+            </div>
+            <div class="blame-view">
+                @foreach (var group in blameGroups)
+                {
+                    <div class="blame-group">
+                        <div class="blame-info @group.AgeClass">
+                            <a href="/@repo.Owner/@repo.Name/commit/@group.CommitSha" class="blame-sha" title="@group.Message">@group.ShortSha</a>
+                            <span class="blame-author">@group.Author</span>
+                            @if (!string.IsNullOrEmpty(group.Message))
+                            {
+                                <span class="blame-message" title="@group.Message">@TruncateMessage(group.Message)</span>
+                            }
+                            <span class="blame-date">@FormatDate(group.Date)</span>
+                        </div>
+                        <div class="blame-lines">
+                            @foreach (var line in group.Lines)
+                            {
+                                <div class="blame-line">
+                                    <span class="line-number">@line.LineNumber</span>
+                                    <code>@line.Content</code>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <pre class="file-content syntax-pending"><code class="@LanguageClass">@file.Content</code></pre>
+        }
     }
 }
 
@@ -58,8 +111,13 @@ else
 
     private Repository? repo;
     private TreeNode? file;
-    private string[] pathParts => Path?.Split('/', '\\') ?? [];
+    private IReadOnlyList<(string Path, string Name)> directorySegments => ComputeDirectorySegments(Path);
     private string LanguageClass => $"language-{GetLanguage(Path)}";
+
+    private bool showBlame = false;
+    private bool blameLoading = false;
+    private List<BlameLine> blameLines = [];
+    private List<BlameGroup> blameGroups = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -72,10 +130,98 @@ else
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (file?.Content != null)
+        if (!showBlame && file?.Content != null)
         {
             await JS.InvokeVoidAsync("forge.highlightCodeBlocks");
         }
+    }
+
+    private async Task ToggleBlame()
+    {
+        if (!showBlame && blameLines.Count == 0 && repo != null && !string.IsNullOrEmpty(Path))
+        {
+            blameLoading = true;
+            try
+            {
+                var lines = await GitService.GetBlameAsync(repo, Branch, Path);
+                blameLines = lines.ToList();
+                blameGroups = GroupByCommit(blameLines);
+            }
+            finally
+            {
+                blameLoading = false;
+            }
+        }
+        showBlame = !showBlame;
+    }
+
+    private static List<BlameGroup> GroupByCommit(List<BlameLine> lines)
+    {
+        var groups = new List<BlameGroup>();
+        
+        foreach (var line in lines)
+        {
+            // Check if this line belongs to the previous group
+            if (groups.Count > 0)
+            {
+                var lastGroup = groups[^1];
+                if (lastGroup.CommitSha == line.CommitSha)
+                {
+                    lastGroup.Lines.Add(line);
+                    continue;
+                }
+            }
+            
+            // Start a new group
+            groups.Add(new BlameGroup
+            {
+                CommitSha = line.CommitSha,
+                ShortSha = line.ShortSha,
+                Author = line.Author,
+                Date = line.Date,
+                Message = line.Message,
+                AgeClass = GetAgeClass(line.Date),
+                Lines = [line]
+            });
+        }
+        
+        return groups;
+    }
+
+    private static IReadOnlyList<(string Path, string Name)> ComputeDirectorySegments(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return [];
+        }
+
+        var parts = path.Split(['/', '\\'], StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length <= 1)
+        {
+            return [];
+        }
+
+        var segments = new List<(string Path, string Name)>(parts.Length - 1);
+        var accumulated = "";
+
+        foreach (var part in parts.Take(parts.Length - 1))
+        {
+            accumulated = string.IsNullOrEmpty(accumulated) ? part : $"{accumulated}/{part}";
+            segments.Add((accumulated, part));
+        }
+
+        return segments;
+    }
+
+    private static string GetAgeClass(DateTime date)
+    {
+        var age = DateTime.UtcNow - date;
+        
+        if (age.TotalDays < 7) return "blame-age-new";           // < 1 week: green
+        if (age.TotalDays < 30) return "blame-age-recent";       // < 1 month: yellow
+        if (age.TotalDays < 90) return "blame-age-medium";       // < 3 months: orange
+        if (age.TotalDays < 365) return "blame-age-old";         // < 1 year: blue
+        return "blame-age-ancient";                               // > 1 year: gray
     }
 
     private static string GetLanguage(string? path)
@@ -101,5 +247,40 @@ else
         double size = bytes;
         while (size >= 1024 && i < s.Length - 1) { size /= 1024; i++; }
         return $"{size:0.#} {s[i]}";
+    }
+
+    private static string FormatDate(DateTime date)
+    {
+        var diff = DateTime.UtcNow - date;
+        if (diff.TotalDays < 1)
+            return diff.TotalHours < 1 ? $"{(int)diff.TotalMinutes}m ago" : $"{(int)diff.TotalHours}h ago";
+        if (diff.TotalDays < 7)
+            return $"{(int)diff.TotalDays}d ago";
+        if (diff.TotalDays < 365)
+            return date.ToString("MMM d");
+        return date.ToString("MMM d, yyyy");
+    }
+
+    private static string TruncateMessage(string? message)
+    {
+        if (string.IsNullOrEmpty(message))
+            return "";
+        
+        // Get first line only
+        var firstLine = message.Split('\n')[0].Trim();
+        
+        // Truncate to fit in blame info column
+        return firstLine.Length > 24 ? $"{firstLine[..24]}…" : firstLine;
+    }
+
+    private class BlameGroup
+    {
+        public string CommitSha { get; set; } = "";
+        public string ShortSha { get; set; } = "";
+        public string Author { get; set; } = "";
+        public DateTime Date { get; set; }
+        public string? Message { get; set; }
+        public string AgeClass { get; set; } = "";
+        public List<BlameLine> Lines { get; set; } = [];
     }
 }

@@ -1,5 +1,4 @@
 @page "/{Owner}/{Name}/commit/{Sha}"
-@using System.Web
 @inject IRepositoryService RepositoryService
 @inject IGitService GitService
 @using Forge.Core.Models
@@ -53,26 +52,29 @@ else
                 </div>
                 @if (!string.IsNullOrEmpty(change.Diff))
                 {
-                    <pre class="diff-content">@foreach (var line in change.Diff.Split('\n'))
-                    {
-                        @if (line.StartsWith("@@") || line.StartsWith("diff --git") || line.StartsWith("index ") || line.StartsWith("--- ") || line.StartsWith("+++ "))
-                        {
-                            <span class="diff-line-header">@HttpUtility.HtmlEncode(line)</span>
-                        }
-                        else if (line.StartsWith("+") && !line.StartsWith("+++"))
-                        {
-                            <span class="diff-line-add">@HttpUtility.HtmlEncode(line)</span>
-                        }
-                        else if (line.StartsWith("-") && !line.StartsWith("---"))
-                        {
-                            <span class="diff-line-del">@HttpUtility.HtmlEncode(line)</span>
-                        }
-                        else
-                        {
-                            @HttpUtility.HtmlEncode(line)
-                        }<text>
+                    <pre class="diff-content">
+@foreach (var line in change.Diff.Split('\n'))
+{
+    @if (line.StartsWith("@@") || line.StartsWith("diff --git") || line.StartsWith("index ") || line.StartsWith("--- ") || line.StartsWith("+++ "))
+    {
+        <span class="diff-line-header">@line</span>
+    }
+    else if (line.StartsWith("+") && !line.StartsWith("+++"))
+    {
+        <span class="diff-line-add">@line</span>
+    }
+    else if (line.StartsWith("-") && !line.StartsWith("---"))
+    {
+        <span class="diff-line-del">@line</span>
+    }
+    else
+    {
+        @line
+    }
+    <text>
 </text>
-                    }</pre>
+}
+                    </pre>
                 }
             </div>
         }
