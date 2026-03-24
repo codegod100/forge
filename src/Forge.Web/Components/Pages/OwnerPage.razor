@@ -1,0 +1,54 @@
+@page "/{Owner}"
+@inject IRepositoryService RepositoryService
+
+<PageTitle>@Owner - Forge</PageTitle>
+
+<div class="repo-header">
+    <h1>@Owner</h1>
+</div>
+
+@if (repos == null)
+{
+    <p>Loading...</p>
+}
+else if (!repos.Any())
+{
+    <p class="empty-state">No repositories</p>
+}
+else
+{
+    @foreach (var repo in repos)
+    {
+        <div class="card" style="margin-bottom: 0.5rem; padding: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <a href="/@repo.Owner/@repo.Name" style="font-weight: 600; font-size: 1.1rem;">
+                        @repo.Name
+                    </a>
+                    @if (repo.IsPrivate)
+                    {
+                        <span class="badge">Private</span>
+                    }
+                    @if (!string.IsNullOrEmpty(repo.Description))
+                    {
+                        <p style="margin: 0.25rem 0 0 0; color: #8b949e;">@repo.Description</p>
+                    }
+                </div>
+                <div style="color: #8b949e; font-size: 0.875rem;">
+                    Updated @repo.UpdatedAt.ToString("yyyy-MM-dd")
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public string Owner { get; set; } = "";
+
+    private IEnumerable<Repository>? repos;
+
+    protected override async Task OnInitializedAsync()
+    {
+        repos = await RepositoryService.GetByOwnerAsync(Owner);
+    }
+}
