@@ -36,9 +36,9 @@ else
     </div>
 
     <div class="tabs">
-        <button class="tab @(tab == "files" ? "active" : "")" @onclick="ShowFiles">Files</button>
-        <button class="tab @(tab == "commits" ? "active" : "")" @onclick="ShowCommits">Commits</button>
-        <button class="tab @(tab == "branches" ? "active" : "")" @onclick="ShowBranches">Branches</button>
+        <button type="button" class="tab @(tab == "files" ? "active" : "")" @onclick="ShowFiles">Files</button>
+        <button type="button" class="tab @(tab == "commits" ? "active" : "")" @onclick="ShowCommits">Commits</button>
+        <button type="button" class="tab @(tab == "branches" ? "active" : "")" @onclick="ShowBranches">Branches</button>
     </div>
 
     @if (tab == "files")
