@@ -94,13 +94,27 @@ else
                         <tr>
                             <td class="icon">@(f.Type == TreeEntryType.Directory ? "📁" : "📄")</td>
                             <td class="name">
-                                @if (f.Type == TreeEntryType.Directory)
+                                @if (string.IsNullOrEmpty(fileSearchQuery))
                                 {
-                                    <a href="/@repo.Owner/@repo.Name/tree/@repo.DefaultBranch/@f.Path">@HighlightMatch(f.Name, fileSearchQuery)</a>
+                                    @if (f.Type == TreeEntryType.Directory)
+                                    {
+                                        <a href="/@repo.Owner/@repo.Name/tree/@repo.DefaultBranch/@f.Path">@f.Name</a>
+                                    }
+                                    else
+                                    {
+                                        <a href="/@repo.Owner/@repo.Name/blob/@repo.DefaultBranch/@f.Path">@f.Name</a>
+                                    }
                                 }
                                 else
                                 {
-                                    <a href="/@repo.Owner/@repo.Name/blob/@repo.DefaultBranch/@f.Path">@HighlightMatch(f.Name, fileSearchQuery)</a>
+                                    @if (f.Type == TreeEntryType.Directory)
+                                    {
+                                        <a href="/@repo.Owner/@repo.Name/tree/@repo.DefaultBranch/@f.Path">@HighlightMatch(f.Path, fileSearchQuery)</a>
+                                    }
+                                    else
+                                    {
+                                        <a href="/@repo.Owner/@repo.Name/blob/@repo.DefaultBranch/@f.Path">@HighlightMatch(f.Path, fileSearchQuery)</a>
+                                    }
                                 }
                             </td>
                             <td class="size">@(f.Size.HasValue ? FormatSize(f.Size.Value) : "")</td>
@@ -109,7 +123,7 @@ else
                 </tbody>
             </table>
 
-            @if (files.Any() && !filteredFiles.Any() && !string.IsNullOrEmpty(fileSearchQuery))
+            @if (allFiles != null && allFiles.Any() && !filteredFiles.Any() && !string.IsNullOrEmpty(fileSearchQuery))
             {
                 <p class="empty-state">No files match your search</p>
             }
@@ -232,11 +246,12 @@ else
     private Repository? repo;
     private IEnumerable<BranchInfo>? branchList;
     private IEnumerable<TreeNode>? files;
+    private IEnumerable<TreeNode>? allFiles;
     private IEnumerable<CommitInfo>? commitList;
     private CommitInfo? lastCommit;
     private IEnumerable<TreeNode> filteredFiles => string.IsNullOrEmpty(fileSearchQuery) 
         ? (files ?? []) 
-        : (files ?? []).Where(f => f.Name.Contains(fileSearchQuery, StringComparison.OrdinalIgnoreCase));
+        : (allFiles ?? []).Where(f => f.Path.Contains(fileSearchQuery, StringComparison.OrdinalIgnoreCase));
     private MarkupString readmeHtml;
     private string? readmeName;
     private string? currentUser;
@@ -262,6 +277,7 @@ else
         {
             branchList = await GitService.GetBranchesAsync(repo);
             files = await GitService.GetTreeAsync(repo, repo.DefaultBranch);
+            allFiles = await GitService.GetAllFilesAsync(repo, repo.DefaultBranch);
             commitList = await GitService.GetCommitsAsync(repo, repo.DefaultBranch);
             lastCommit = commitList?.FirstOrDefault();
             description = repo.Description;

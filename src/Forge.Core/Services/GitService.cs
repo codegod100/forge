@@ -185,6 +185,63 @@ public class GitService : IGitService
         }
     }
 
+    public async Task<IEnumerable<TreeNode>> GetAllFilesAsync(Models.Repository repository, string branch)
+    {
+        var fullPath = GetFullPath(repository);
+        if (!Directory.Exists(fullPath))
+            return [];
+        
+        try
+        {
+            using var repo = new LibGit2SharpRepository(fullPath);
+            
+            var gitBranch = repo.Branches[branch];
+            if (gitBranch == null)
+                return [];
+            
+            var tree = gitBranch.Tip?.Tree;
+            if (tree == null)
+                return [];
+            
+            var nodes = new List<TreeNode>();
+            CollectAllFiles(tree, "", nodes);
+            
+            return await Task.FromResult(nodes.OrderBy(n => n.Path).ToList());
+        }
+        catch (LibGit2SharpException ex)
+        {
+            Console.WriteLine($"[Forge] Git error in GetAllFilesAsync: {ex.Message}");
+            return [];
+        }
+    }
+
+    private static void CollectAllFiles(Tree tree, string basePath, List<TreeNode> nodes)
+    {
+        foreach (var entry in tree)
+        {
+            var path = string.IsNullOrEmpty(basePath) ? entry.Name : $"{basePath}/{entry.Name}";
+            
+            if (entry.Target is Tree subTree)
+            {
+                CollectAllFiles(subTree, path, nodes);
+            }
+            else if (entry.Target is Blob blob)
+            {
+                long? size = null;
+                try { size = blob.Size; } catch { }
+                
+                nodes.Add(new TreeNode
+                {
+                    Name = entry.Name,
+                    Path = path,
+                    Type = TreeEntryType.File,
+                    Sha = blob.Sha,
+                    Size = size
+                });
+            }
+        }
+    }
+
     public async Task<TreeNode?> GetFileAsync(Models.Repository repository, string branch, string path)
     {
         var fullPath = GetFullPath(repository);

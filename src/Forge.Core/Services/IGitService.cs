@@ -33,6 +33,11 @@ public interface IGitService
     Task<IEnumerable<TreeNode>> GetTreeAsync(Repository repository, string branch, string? path = null);
     
     /// <summary>
+    /// Get all files in a repository recursively
+    /// </summary>
+    Task<IEnumerable<TreeNode>> GetAllFilesAsync(Repository repository, string branch);
+    
+    /// <summary>
     /// Get a single file's content
     /// </summary>
     Task<TreeNode?> GetFileAsync(Repository repository, string branch, string path);
