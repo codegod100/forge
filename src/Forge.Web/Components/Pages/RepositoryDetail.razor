@@ -1,7 +1,12 @@
 @page "/{Owner}/{Name}"
+@page "/{Owner}/{Name}/settings"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @inject IRepositoryService RepositoryService
 @inject IGitService GitService
 @inject NavigationManager Navigation
+@rendermode InteractiveServer
 
 <PageTitle>@(repo?.Owner)/@(repo?.Name) - Forge</PageTitle>
 
@@ -23,6 +28,12 @@ else
         {
             <p class="description">@repo.Description</p>
         }
+        @if (IsOwner)
+        {
+            <p style="margin-top: 0.75rem;">
+                <a href="/@repo.Owner/@repo.Name/settings" class="btn-secondary">Settings</a>
+            </p>
+        }
     </div>
 
     <div class="clone-box">
@@ -37,6 +48,10 @@ else
         <a href="/@Owner/@Name?tab=files" class="tab @(tab == "files" ? "active" : "")">Files</a>
         <a href="/@Owner/@Name?tab=commits" class="tab @(tab == "commits" ? "active" : "")">Commits</a>
         <a href="/@Owner/@Name?tab=branches" class="tab @(tab == "branches" ? "active" : "")">Branches</a>
+        @if (IsOwner)
+        {
+            <a href="/@Owner/@Name/settings" class="tab @(tab == "settings" ? "active" : "")">Settings</a>
+        }
     </div>
 
     @if (tab == "files")
@@ -118,27 +133,92 @@ else
             }
         }
     }
+    else if (tab == "settings")
+    {
+        @if (!IsOwner)
+        {
+            <p class="empty-state">You do not have permission to edit this repository.</p>
+        }
+        else
+        {
+            @if (!string.IsNullOrEmpty(message))
+            {
+                <p class="success-message">@message</p>
+            }
+
+            @if (!string.IsNullOrEmpty(error))
+            {
+                <p class="auth-error">@error</p>
+            }
+
+            <div class="card settings-card">
+                <div class="form-group">
+                    <label>Owner</label>
+                    <input value="@repo.Owner" disabled />
+                </div>
+
+                <div class="form-group">
+                    <label>Repository Name</label>
+                    <input value="@repo.Name" disabled />
+                </div>
+
+                <div class="form-group">
+                    <label>Description</label>
+                    <input @bind="description" @bind:event="oninput" placeholder="A short description" />
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" @bind="isPrivate" />
+                        Private repository
+                    </label>
+                    <p class="form-help">Private repositories require authentication for clone/fetch and push.</p>
+                </div>
+
+                <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                    <button type="button" class="btn-primary" @onclick="SaveSettingsAsync">Save Changes</button>
+                    <a href="/@repo.Owner/@repo.Name" class="btn-secondary">Back to Repository</a>
+                </div>
+            </div>
+        }
+    }
 }
 
 @code {
     [Parameter] public string Owner { get; set; } = "";
     [Parameter] public string Name { get; set; } = "";
     [SupplyParameterFromQuery] public string? Tab { get; set; }
+    [CascadingParameter] private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
 
     private Repository? repo;
     private IEnumerable<BranchInfo>? branchList;
     private IEnumerable<TreeNode>? files;
     private IEnumerable<CommitInfo>? commitList;
-    private string tab => Tab ?? "files";
+    private string? currentUser;
+    private string? description;
+    private bool isPrivate;
+    private string? message;
+    private string? error;
+    private bool IsOwner => repo != null && string.Equals(currentUser, repo.Owner, StringComparison.Ordinal);
+    private bool IsSettingsRoute => Navigation.ToBaseRelativePath(Navigation.Uri).Equals($"{Owner}/{Name}/settings", StringComparison.OrdinalIgnoreCase);
+    private string tab => IsSettingsRoute ? "settings" : Tab ?? "files";
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
+        if (AuthenticationStateTask != null)
+        {
+            var authState = await AuthenticationStateTask;
+            currentUser = authState.User.Identity?.Name;
+        }
+
         repo = await RepositoryService.GetByOwnerAndNameAsync(Owner, Name);
         if (repo != null)
         {
             branchList = await GitService.GetBranchesAsync(repo);
             files = await GitService.GetTreeAsync(repo, repo.DefaultBranch);
             commitList = await GitService.GetCommitsAsync(repo, repo.DefaultBranch);
+            description = repo.Description;
+            isPrivate = repo.IsPrivate;
         }
     }
 
@@ -156,6 +236,24 @@ else
         return $"git remote add origin https://user:token@{baseUrl}/{repo!.Owner}/{repo!.Name}.git\n" +
                $"git branch -M main\n" +
                $"git push -u origin main";
+    }
+
+    private async Task SaveSettingsAsync()
+    {
+        if (repo == null || !IsOwner)
+        {
+            error = "You do not have permission to edit this repository.";
+            message = null;
+            return;
+        }
+
+        repo.Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+        repo.IsPrivate = isPrivate;
+
+        await RepositoryService.UpdateAsync(repo);
+
+        message = "Repository settings saved.";
+        error = null;
     }
 
     private static string FormatSize(long bytes)

@@ -1,14 +1,13 @@
+@page "/admin"
 @page "/{Owner}"
+@using Microsoft.AspNetCore.Components.Authorization
 @inject IRepositoryService RepositoryService
-@using Microsoft.EntityFrameworkCore
 
-<PageTitle>@Owner - Forge</PageTitle>
+<PageTitle>@CurrentOwner - Forge</PageTitle>
 
 <div class="repo-header">
-    <h1>@Owner</h1>
+    <h1>@CurrentOwner</h1>
 </div>
-
-<p>Owner parameter: @Owner</p>
 
 @if (repos == null)
 {
@@ -16,28 +15,48 @@
 }
 else if (!repos.Any())
 {
-    <p class="empty-state">No repositories for @Owner</p>
+    <p class="empty-state">No repositories for @CurrentOwner</p>
 }
 else
 {
-    <p>Found @repos.Count() repos</p>
     @foreach (var repo in repos)
     {
         <div class="card" style="margin-bottom: 0.5rem; padding: 1rem;">
-            <a href="/@repo.Owner/@repo.Name">@repo.Name</a>
+            <a href="/@repo.Owner/@repo.Name" style="font-weight: 600; font-size: 1.1rem;">
+                @repo.Owner/@repo.Name
+            </a>
+            @if (repo.IsPrivate)
+            {
+                <span class="badge">Private</span>
+            }
+            @if (!string.IsNullOrEmpty(repo.Description))
+            {
+                <p style="margin: 0.25rem 0 0 0; color: #8b949e;">@repo.Description</p>
+            }
         </div>
     }
 }
 
 @code {
-    [Parameter] public string Owner { get; set; } = "";
+    [Parameter] public string? Owner { get; set; }
+    [CascadingParameter] private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
 
     private IEnumerable<Repository>? repos;
+    private string CurrentOwner => string.IsNullOrWhiteSpace(Owner) ? "admin" : Owner;
 
     protected override async Task OnParametersSetAsync()
     {
-        Console.WriteLine($"[OwnerPage] Owner={Owner}");
-        repos = await RepositoryService.GetByOwnerAsync(Owner);
-        Console.WriteLine($"[OwnerPage] Found {repos?.Count() ?? 0} repos");
+        var ownerRepos = await RepositoryService.GetByOwnerAsync(CurrentOwner);
+        var isAuthenticated = false;
+
+        if (AuthenticationStateTask != null)
+        {
+            var authState = await AuthenticationStateTask;
+            isAuthenticated = authState.User.Identity?.IsAuthenticated == true;
+        }
+
+        repos = isAuthenticated
+            ? ownerRepos
+            : ownerRepos.Where(r => !r.IsPrivate);
     }
 }

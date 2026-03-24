@@ -1,10 +1,23 @@
 @inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Authorization
 
 <div class="layout">
     <header class="header">
         <a href="/" class="logo">🔧 Forge</a>
         <nav class="nav">
-            <a href="/repos/new" class="btn-primary">+ New Repo</a>
+            <AuthorizeView>
+                <Authorized>
+                    <span class="nav-user">@context.User.Identity?.Name</span>
+                    <a href="/repos/new" class="btn-primary">+ New Repo</a>
+                    <form method="post" action="/auth/logout" class="inline-form">
+                        <AntiforgeryToken />
+                        <button type="submit" class="btn-secondary">Log Out</button>
+                    </form>
+                </Authorized>
+                <NotAuthorized>
+                    <a href="/login" class="btn-secondary">Log In</a>
+                </NotAuthorized>
+            </AuthorizeView>
         </nav>
     </header>
     <main class="content">

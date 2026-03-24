@@ -1,17 +1,23 @@
 using System.Diagnostics;
 using System.Text;
+using Forge.Core.Services;
 using Forge.Data.Services;
+using Forge.Web.Auth;
 
 namespace Forge.Web.GitHttp;
 
 public class GitHttpMiddleware
 {
     private readonly IRepositoryService _repoService;
+    private readonly IGitService _gitService;
+    private readonly IAuthService _authService;
     private readonly string _repositoriesRoot;
 
-    public GitHttpMiddleware(IRepositoryService repoService, string repositoriesRoot)
+    public GitHttpMiddleware(IRepositoryService repoService, IGitService gitService, IAuthService authService, string repositoriesRoot)
     {
         _repoService = repoService;
+        _gitService = gitService;
+        _authService = authService;
         _repositoriesRoot = repositoriesRoot;
     }
 
@@ -19,16 +25,13 @@ public class GitHttpMiddleware
     {
         var repoPath = Path.Combine(_repositoriesRoot, owner, $"{repoName}.git");
         Console.WriteLine($"[Git] InfoRefs: {repoPath}");
-        
-        if (!Directory.Exists(repoPath))
+
+        var repo = await EnsureRepositoryForPushAsync(context, owner, repoName, service);
+        if (repo == null)
         {
-            Console.WriteLine($"[Git] Repo not found: {repoPath}");
-            context.Response.StatusCode = 404;
-            await context.Response.WriteAsync("Repository not found");
             return;
         }
 
-        var repo = await _repoService.GetByOwnerAndNameAsync(owner, repoName);
         if (repo == null)
         {
             Console.WriteLine($"[Git] Repo not in database: {owner}/{repoName}");
@@ -37,7 +40,7 @@ public class GitHttpMiddleware
             return;
         }
 
-        if (service == "git-receive-pack" && !IsAuthenticated(context))
+        if ((repo.IsPrivate || service == "git-receive-pack") && !IsAuthenticated(context))
         {
             context.Response.StatusCode = 401;
             context.Response.Headers.WWWAuthenticate = "Basic realm=\"Forge Git\"";
@@ -58,15 +61,13 @@ public class GitHttpMiddleware
     public async Task HandleServiceAsync(HttpContext context, string owner, string repoName, string service)
     {
         var repoPath = Path.Combine(_repositoriesRoot, owner, $"{repoName}.git");
-        
-        if (!Directory.Exists(repoPath))
+
+        var repo = await EnsureRepositoryForPushAsync(context, owner, repoName, service);
+        if (repo == null)
         {
-            context.Response.StatusCode = 404;
-            await context.Response.WriteAsync("Repository not found");
             return;
         }
 
-        var repo = await _repoService.GetByOwnerAndNameAsync(owner, repoName);
         if (repo == null)
         {
             context.Response.StatusCode = 404;
@@ -74,7 +75,7 @@ public class GitHttpMiddleware
             return;
         }
 
-        if (service == "git-receive-pack" && !IsAuthenticated(context))
+        if ((repo.IsPrivate || service == "git-receive-pack") && !IsAuthenticated(context))
         {
             context.Response.StatusCode = 401;
             context.Response.Headers.WWWAuthenticate = "Basic realm=\"Forge Git\"";
@@ -92,22 +93,77 @@ public class GitHttpMiddleware
         await context.Response.Body.WriteAsync(result);
     }
 
+    private async Task<Forge.Core.Models.Repository?> EnsureRepositoryForPushAsync(HttpContext context, string owner, string repoName, string service)
+    {
+        var repoPath = Path.Combine(_repositoriesRoot, owner, $"{repoName}.git");
+        var repo = await _repoService.GetByOwnerAndNameAsync(owner, repoName);
+
+        if (repo != null)
+        {
+            if (!Directory.Exists(repoPath))
+            {
+                _gitService.EnsureRepositoryExists(repo);
+            }
+
+            return repo;
+        }
+
+        if (Directory.Exists(repoPath))
+        {
+            context.Response.StatusCode = 404;
+            await context.Response.WriteAsync("Repository not found in database");
+            return null;
+        }
+
+        if (service != "git-receive-pack")
+        {
+            context.Response.StatusCode = 404;
+            await context.Response.WriteAsync("Repository not found");
+            return null;
+        }
+
+        var credentials = GetBasicCredentials(context);
+        if (credentials == null || !_authService.ValidateCredentials(credentials.Value.Username, credentials.Value.Password))
+        {
+            context.Response.StatusCode = 401;
+            context.Response.Headers.WWWAuthenticate = "Basic realm=\"Forge Git\"";
+            return null;
+        }
+
+        if (!string.Equals(credentials.Value.Username, owner, StringComparison.Ordinal))
+        {
+            context.Response.StatusCode = 403;
+            await context.Response.WriteAsync("You can only create repositories for your own owner.");
+            return null;
+        }
+
+        repo = await _gitService.InitializeRepositoryAsync(repoName, owner);
+        await _repoService.CreateAsync(repo);
+        return repo;
+    }
+
     private bool IsAuthenticated(HttpContext context)
+    {
+        var credentials = GetBasicCredentials(context);
+        return credentials != null && _authService.ValidateCredentials(credentials.Value.Username, credentials.Value.Password);
+    }
+
+    private (string Username, string Password)? GetBasicCredentials(HttpContext context)
     {
         var authHeader = context.Request.Headers.Authorization.ToString();
         if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Basic "))
-            return false;
+            return null;
 
         try
         {
             var encoded = authHeader["Basic ".Length..].Trim();
             var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(encoded));
             var parts = decoded.Split(':', 2);
-            return parts.Length == 2 && !string.IsNullOrEmpty(parts[1]);
+            return parts.Length == 2 ? (parts[0], parts[1]) : null;
         }
         catch
         {
-            return false;
+            return null;
         }
     }
 

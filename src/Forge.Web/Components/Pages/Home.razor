@@ -1,4 +1,5 @@
 @page "/"
+@using Microsoft.AspNetCore.Components.Authorization
 @inject IRepositoryService RepositoryService
 
 <PageTitle>All Repositories - Forge</PageTitle>
@@ -46,10 +47,23 @@ else
 }
 
 @code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
     private IEnumerable<Repository>? repositories;
 
     protected override async Task OnInitializedAsync()
     {
-        repositories = await RepositoryService.GetAllAsync();
+        var allRepositories = await RepositoryService.GetAllAsync();
+        var isAuthenticated = false;
+
+        if (AuthenticationStateTask != null)
+        {
+            var authState = await AuthenticationStateTask;
+            isAuthenticated = authState.User.Identity?.IsAuthenticated == true;
+        }
+
+        repositories = isAuthenticated
+            ? allRepositories
+            : allRepositories.Where(r => !r.IsPrivate);
     }
 }

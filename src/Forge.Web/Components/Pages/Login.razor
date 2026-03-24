@@ -1,0 +1,45 @@
+@page "/login"
+@using Microsoft.AspNetCore.Components
+
+<PageTitle>Log In - Forge</PageTitle>
+
+<div class="auth-card">
+    <h1>Log In</h1>
+    <p class="auth-copy">Use the configured Forge credentials to create repositories and push over Git HTTP.</p>
+
+    @if (Error)
+    {
+        <p class="auth-error">Invalid username or password.</p>
+    }
+
+    <form method="post" action="/auth/login" class="auth-form">
+        <AntiforgeryToken />
+        <input type="hidden" name="returnUrl" value="@SanitizedReturnUrl" />
+
+        <div class="form-group">
+            <label for="username">Username</label>
+            <input id="username" name="username" autocomplete="username" required />
+        </div>
+
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" required />
+        </div>
+
+        <button type="submit" class="btn-primary">Log In</button>
+    </form>
+</div>
+
+@code {
+    [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
+    [SupplyParameterFromQuery(Name = "error")] public string? ErrorValue { get; set; }
+
+    private string SanitizedReturnUrl =>
+        !string.IsNullOrWhiteSpace(ReturnUrl) && Uri.IsWellFormedUriString(ReturnUrl, UriKind.Relative) && ReturnUrl.StartsWith('/')
+            ? ReturnUrl
+            : "/admin";
+
+    private bool Error =>
+        string.Equals(ErrorValue, "true", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(ErrorValue, "1", StringComparison.Ordinal);
+}

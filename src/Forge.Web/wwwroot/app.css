@@ -62,6 +62,23 @@ a:hover {
     color: #f0f6fc;
 }
 
+.nav {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.nav-user {
+    color: #8b949e;
+    font-size: 0.875rem;
+}
+
+.inline-form {
+    display: inline-flex;
+    margin: 0;
+}
+
 .content {
     flex: 1;
     padding: 2rem;
@@ -84,6 +101,22 @@ a:hover {
 
 .btn-primary:hover {
     background: #2ea043;
+    text-decoration: none;
+}
+
+.btn-secondary {
+    background: transparent;
+    color: #f0f6fc;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    border: 1px solid #30363d;
+    cursor: pointer;
+    font-size: 0.875rem;
+    text-decoration: none;
+}
+
+.btn-secondary:hover {
+    background: #21262d;
     text-decoration: none;
 }
 
@@ -202,6 +235,45 @@ a:hover {
     font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
     font-size: 0.875rem;
     line-height: 1.6;
+}
+
+.auth-card {
+    max-width: 420px;
+    margin: 3rem auto;
+    padding: 1.5rem;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+}
+
+.auth-copy {
+    color: #8b949e;
+    margin: 0.5rem 0 1.5rem 0;
+}
+
+.auth-form {
+    display: grid;
+    gap: 1rem;
+}
+
+.auth-error {
+    color: #f85149;
+    margin-bottom: 1rem;
+}
+
+.success-message {
+    color: #3fb950;
+    margin-bottom: 1rem;
+}
+
+.settings-card {
+    max-width: 640px;
+}
+
+.form-help {
+    color: #8b949e;
+    font-size: 0.875rem;
+    margin: 0.5rem 0 0 0;
 }
 
 /* Commit List */
