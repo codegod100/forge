@@ -30,20 +30,6 @@ else
         {
             <p class="description">@repo.Description</p>
         }
-        @if (IsOwner)
-        {
-            <p style="margin-top: 0.75rem;">
-                <a href="/@repo.Owner/@repo.Name/settings" class="btn-secondary">Settings</a>
-            </p>
-        }
-    </div>
-
-    <div class="clone-box">
-        <h3>Clone</h3>
-        <code style="display: block; background: #0d1117; padding: 0.5rem 0.75rem; border-radius: 4px; font-family: monospace; font-size: 0.875rem;">@($"git clone http://{GetBaseUrl()}/{repo.Owner}/{repo.Name}.git")</code>
-        
-        <h3 style="margin-top: 1rem;">Push an existing repository</h3>
-        <div style="background: #0d1117; padding: 0.5rem 0.75rem; border-radius: 4px; font-family: monospace; font-size: 0.875rem; white-space: pre-wrap;">@GetPushCommands()</div>
     </div>
 
     <div class="tabs">
@@ -63,6 +49,14 @@ else
             <div class="empty-state">
                 <p>Empty repository</p>
                 <p style="font-size: 0.875rem; color: #8b949e;">Push some code to get started!</p>
+            </div>
+
+            <div class="clone-box">
+                <h3>Clone</h3>
+                <code style="display: block; background: #0d1117; padding: 0.5rem 0.75rem; border-radius: 4px; font-family: monospace; font-size: 0.875rem;">@($"git clone http://{GetBaseUrl()}/{repo.Owner}/{repo.Name}.git")</code>
+                
+                <h3 style="margin-top: 1rem;">Push an existing repository</h3>
+                <div style="background: #0d1117; padding: 0.5rem 0.75rem; border-radius: 4px; font-family: monospace; font-size: 0.875rem; white-space: pre-wrap;">@GetPushCommands()</div>
             </div>
         }
         else

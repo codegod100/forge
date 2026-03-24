@@ -1,0 +1,4 @@
+[[paths]]
+glob = "secrets/*.age"
+rules = "secrets.nix"
+identities = ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPsBDVEb9Kl3JfyOQRJE8jPtIXPjfnmv4oFGKVxvMwnH nandi@nixos"]

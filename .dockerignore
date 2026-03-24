@@ -1,0 +1,12 @@
+.git
+.github
+.direnv
+.envrc
+bin
+obj
+src/**/bin
+src/**/obj
+src/Forge.Web/forge.db
+src/Forge.Web/forge.db-shm
+src/Forge.Web/forge.db-wal
+src/Forge.Web/repositories

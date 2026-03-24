@@ -6,4 +6,5 @@ public class AuthOptions
 
     public string Username { get; set; } = "admin";
     public string Password { get; set; } = "";
+    public string PasswordFile { get; set; } = "";
 }
