@@ -1,0 +1,74 @@
+@page "/{Owner}/{Name}/commit/{Sha}"
+@inject IRepositoryService RepositoryService
+@inject IGitService GitService
+
+<PageTitle>@(commit?.Sha[..7]) - @Owner/@Name - Forge</PageTitle>
+
+@if (repo == null || commit == null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <div class="repo-header">
+        <h1>
+            <a href="/@repo.Owner">@repo.Owner</a> / <a href="/@repo.Owner/@repo.Name"><strong>@repo.Name</strong></a>
+        </h1>
+    </div>
+
+    <div class="commit-detail">
+        <div class="commit-header">
+            <h2>@commit.Message.Split('\n')[0]</h2>
+            <code class="sha">@commit.Sha</code>
+        </div>
+        @if (commit.Message.Split('\n').Length > 1)
+        {
+            <div class="commit-body">@string.Join('\n', commit.Message.Split('\n').Skip(1))</div>
+        }
+        <div class="commit-meta">
+            <span><strong>@commit.Author</strong> committed @RelativeTime(commit.AuthorDate)</span>
+        </div>
+    </div>
+
+    @if (commit.Changes?.Any() == true)
+    {
+        <div class="change-list">
+            @foreach (var change in commit.Changes)
+            {
+                <div class="change">
+                    <span class="change-type @change.ChangeType.ToString().ToLower()">@change.ChangeType.ToString()[0]</span>
+                    <a href="/@repo.Owner/@repo.Name/blob/@repo.DefaultBranch/@change.Path">@change.Path</a>
+                </div>
+            }
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public string Owner { get; set; } = "";
+    [Parameter] public string Name { get; set; } = "";
+    [Parameter] public string Sha { get; set; } = "";
+
+    private Repository? repo;
+    private CommitDetail? commit;
+
+    protected override async Task OnInitializedAsync()
+    {
+        repo = await RepositoryService.GetByOwnerAndNameAsync(Owner, Name);
+        if (repo != null)
+        {
+            commit = await GitService.GetCommitAsync(repo, Sha);
+        }
+    }
+
+    private static string RelativeTime(DateTime date)
+    {
+        var span = DateTime.UtcNow - date;
+        if (span.TotalDays > 365) return $"{(int)(span.TotalDays / 365)} years ago";
+        if (span.TotalDays > 30) return $"{(int)(span.TotalDays / 30)} months ago";
+        if (span.TotalDays > 1) return $"{(int)span.TotalDays} days ago";
+        if (span.TotalHours > 1) return $"{(int)span.TotalHours} hours ago";
+        if (span.TotalMinutes > 1) return $"{(int)span.TotalMinutes} minutes ago";
+        return "just now";
+    }
+}
