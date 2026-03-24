@@ -805,6 +805,50 @@ input[type="text"]:focus, textarea:focus {
     white-space: pre-wrap;
 }
 
+/* Clone URL (compact inline) */
+.clone-url {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 1rem;
+    font-size: 0.8125rem;
+}
+
+.clone-label {
+    color: #8b949e;
+    flex-shrink: 0;
+}
+
+.clone-command {
+    background: transparent;
+    font-family: 'SF Mono', Monaco, monospace;
+    color: #58a6ff;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.clone-copy {
+    background: transparent;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    padding: 0.25rem 0.5rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    color: #8b949e;
+    flex-shrink: 0;
+}
+
+.clone-copy:hover {
+    background: #21262d;
+    color: #f0f6fc;
+}
+
 /* Last Commit (above file list) */
 .last-commit {
     background: #161b22;

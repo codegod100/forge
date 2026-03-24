@@ -74,6 +74,12 @@ else
                 </div>
             }
 
+            <div class="clone-url">
+                <span class="clone-label">Clone:</span>
+                <code class="clone-command">@($"git clone http://{GetBaseUrl()}/{repo.Owner}/{repo.Name}.git")</code>
+                <button class="clone-copy" @onclick="CopyCloneUrl" title="Copy clone URL">📋</button>
+            </div>
+
             <div class="file-search-container">
                 <input type="text" 
                        class="file-search-input" 
@@ -350,6 +356,17 @@ else
         return $"git remote add origin https://user:token@{baseUrl}/{repo!.Owner}/{repo!.Name}.git\n" +
                $"git branch -M main\n" +
                $"git push -u origin main";
+    }
+
+    private string GetCloneUrl()
+    {
+        return $"git clone http://{GetBaseUrl()}/{repo!.Owner}/{repo!.Name}.git";
+    }
+
+    private async Task CopyCloneUrl()
+    {
+        var url = $"http://{GetBaseUrl()}/{repo!.Owner}/{repo!.Name}.git";
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", url);
     }
 
     private async Task SaveSettingsAsync()

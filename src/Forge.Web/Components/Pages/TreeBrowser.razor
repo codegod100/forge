@@ -89,17 +89,17 @@ else
     private bool loading = true;
     private string? error;
     private List<(string Path, string Name)> breadcrumbSegments = [];
-    private string? lastProcessedPath;
+    private string? lastRouteKey;
 
     protected override async Task OnParametersSetAsync()
     {
         // Always recompute breadcrumbs from current Path parameter
         breadcrumbSegments = ComputeBreadcrumbSegments(Path);
-        
-        // Only reload if path actually changed
-        if (lastProcessedPath != Path)
+
+        var routeKey = $"{Owner}/{Name}:{Branch}:{Path}";
+        if (lastRouteKey != routeKey)
         {
-            lastProcessedPath = Path;
+            lastRouteKey = routeKey;
             await LoadAsync();
         }
     }
