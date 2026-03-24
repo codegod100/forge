@@ -100,39 +100,62 @@ public class GitService : IGitService
         if (!Directory.Exists(fullPath))
             return [];
         
-        using var repo = new LibGit2SharpRepository(fullPath);
-        
-        var gitBranch = repo.Branches[branch];
-        if (gitBranch == null)
-            return [];
-        
-        var tree = gitBranch.Tip?.Tree;
-        if (tree == null)
-            return [];
-        
-        if (!string.IsNullOrEmpty(path))
+        try
         {
-            var parts = path.Split('/', '\\');
-            foreach (var part in parts)
+            using var repo = new LibGit2SharpRepository(fullPath);
+            
+            var gitBranch = repo.Branches[branch];
+            if (gitBranch == null)
+                return [];
+            
+            var tree = gitBranch.Tip?.Tree;
+            if (tree == null)
+                return [];
+            
+            if (!string.IsNullOrEmpty(path))
             {
-                var entry = tree[part];
-                if (entry?.Target is Tree subTree)
-                    tree = subTree;
-                else
-                    return [];
+                var parts = path.Split('/', '\\');
+                foreach (var part in parts)
+                {
+                    var entry = tree[part];
+                    if (entry?.Target is Tree subTree)
+                        tree = subTree;
+                    else
+                        return [];
+                }
             }
+            
+            // Build list manually to avoid enumeration issues
+            var nodes = new List<TreeNode>();
+            foreach (var entry in tree)
+            {
+                long? size = null;
+                try
+                {
+                    if (entry.Target is Blob blob)
+                        size = blob.Size;
+                }
+                catch { /* ignore lookup errors */ }
+                
+                nodes.Add(new TreeNode
+                {
+                    Name = entry.Name,
+                    Path = string.IsNullOrEmpty(path) ? entry.Name : $"{path}/{entry.Name}",
+                    Type = MapEntryType(entry.Mode),
+                    Sha = entry.TargetId.Sha,
+                    Size = size
+                });
+            }
+            
+            return await Task.FromResult(
+                nodes.OrderBy(n => n.Type == TreeEntryType.Directory ? 0 : 1).ThenBy(n => n.Name).ToList()
+            );
         }
-        
-        var nodes = tree.Select(entry => new TreeNode
+        catch (LibGit2SharpException ex)
         {
-            Name = entry.Name,
-            Path = string.IsNullOrEmpty(path) ? entry.Name : $"{path}/{entry.Name}",
-            Type = MapEntryType(entry.Mode),
-            Sha = entry.Target.Sha,
-            Size = entry.Target is Blob blob ? blob.Size : null
-        }).OrderBy(n => n.Type == TreeEntryType.Directory ? 0 : 1).ThenBy(n => n.Name);
-        
-        return await Task.FromResult(nodes);
+            Console.WriteLine($"[Forge] Git error in GetTreeAsync: {ex.Message}");
+            return [];
+        }
     }
 
     public async Task<TreeNode?> GetFileAsync(Models.Repository repository, string branch, string path)
