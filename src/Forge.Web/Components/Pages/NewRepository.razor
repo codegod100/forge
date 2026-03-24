@@ -1,0 +1,89 @@
+@page "/repos/new"
+@inject IRepositoryService RepositoryService
+@inject IGitService GitService
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>New Repository - Forge</PageTitle>
+
+<h1 style="margin-bottom: 1.5rem;">Create New Repository</h1>
+
+@if (!string.IsNullOrEmpty(error))
+{
+    <p style="color: #f85149; margin-bottom: 1rem;">@error</p>
+}
+
+<div class="card" style="max-width: 500px;">
+    <div class="form-group">
+        <label>Owner</label>
+        <input @bind="owner" @bind:event="oninput" placeholder="username" />
+    </div>
+    
+    <div class="form-group">
+        <label>Repository Name</label>
+        <input @bind="name" @bind:event="oninput" placeholder="my-awesome-project" />
+    </div>
+    
+    <div class="form-group">
+        <label>Description (optional)</label>
+        <input @bind="description" @bind:event="oninput" placeholder="A short description" />
+    </div>
+    
+    <div class="form-group">
+        <label>
+            <input type="checkbox" @bind="isPrivate" />
+            Private repository
+        </label>
+    </div>
+    
+    <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+        <button class="btn-primary" @onclick="HandleSubmit">Create Repository</button>
+        <a href="/" style="color: #8b949e; line-height: 2;">Cancel</a>
+    </div>
+</div>
+
+@code {
+    private string owner = "admin";
+    private string name = "";
+    private string? description;
+    private bool isPrivate = false;
+    private string? error;
+
+    private async Task HandleSubmit()
+    {
+        Console.WriteLine($"HandleSubmit: owner={owner}, name={name}");
+        
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            error = "Repository name is required.";
+            return;
+        }
+
+        // Check if repo already exists
+        var existing = await RepositoryService.GetByOwnerAndNameAsync(owner, name);
+        if (existing != null)
+        {
+            error = $"Repository {owner}/{name} already exists.";
+            return;
+        }
+
+        // Initialize the bare git repository
+        await GitService.InitializeRepositoryAsync(name, owner, description, isPrivate);
+
+        // Create the repository metadata
+        var repository = new Repository
+        {
+            Name = name,
+            Owner = owner,
+            Description = description,
+            IsPrivate = isPrivate,
+            Path = $"{owner}/{name}.git"
+        };
+
+        // Save to database
+        await RepositoryService.CreateAsync(repository);
+
+        // Navigate to the repository page
+        Navigation.NavigateTo($"/{owner}/{name}");
+    }
+}

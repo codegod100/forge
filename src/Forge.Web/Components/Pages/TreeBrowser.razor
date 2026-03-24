@@ -1,0 +1,113 @@
+@page "/{Owner}/{Name}/tree/{Branch}/{*Path}"
+@inject IRepositoryService RepositoryService
+@inject IGitService GitService
+
+<PageTitle>@(repository?.Owner)/@(repository?.Name) - Forge</PageTitle>
+
+@if (repository == null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <div class="repo-header">
+        <h1>
+            <a href="/@repository.Owner">@repository.Owner</a> / <a href="/@repository.Owner/@repository.Name"><strong>@repository.Name</strong></a>
+        </h1>
+    </div>
+
+    <div class="breadcrumb">
+        <a href="/@repository.Owner/@repository.Name/tree/@Branch">root</a>
+        @foreach (var segment in GetPathSegments())
+        {
+            <span> / </span>
+            <a href="/@repository.Owner/@repository.Name/tree/@Branch/@segment.Path">@segment.Name</a>
+        }
+    </div>
+
+    @if (treeNodes == null)
+    {
+        <p>Loading...</p>
+    }
+    else if (!treeNodes.Any())
+    {
+        <p class="empty-state">Empty directory</p>
+    }
+    else
+    {
+        <table class="file-list">
+            <tbody>
+                @foreach (var node in treeNodes)
+                {
+                    <tr>
+                        <td class="icon">
+                            @if (node.Type == TreeEntryType.Directory)
+                            {
+                                <span>📁</span>
+                            }
+                            else
+                            {
+                                <span>📄</span>
+                            }
+                        </td>
+                        <td class="name">
+                            @if (node.Type == TreeEntryType.Directory)
+                            {
+                                <a href="/@repository.Owner/@repository.Name/tree/@Branch/@node.Path">@node.Name</a>
+                            }
+                            else
+                            {
+                                <a href="/@repository.Owner/@repository.Name/blob/@Branch/@node.Path">@node.Name</a>
+                            }
+                        </td>
+                        <td class="size">
+                            @if (node.Size.HasValue)
+                            {
+                                @FormatSize(node.Size.Value)
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+@code {
+    [Parameter] public string Owner { get; set; } = "";
+    [Parameter] public string Name { get; set; } = "";
+    [Parameter] public string Branch { get; set; } = "";
+    [Parameter] public string Path { get; set; } = "";
+
+    private Repository? repository;
+    private IEnumerable<TreeNode>? treeNodes;
+
+    protected override async Task OnInitializedAsync()
+    {
+        repository = await RepositoryService.GetByOwnerAndNameAsync(Owner, Name);
+        if (repository != null)
+        {
+            treeNodes = await GitService.GetTreeAsync(repository, Branch, Path);
+        }
+    }
+
+    private IEnumerable<(string Path, string Name)> GetPathSegments()
+    {
+        var segments = Path.Split('/', '\\');
+        var path = "";
+        foreach (var segment in segments)
+        {
+            path = string.IsNullOrEmpty(path) ? segment : $"{path}/{segment}";
+            yield return (path, segment);
+        }
+    }
+
+    private static string FormatSize(long bytes)
+    {
+        string[] s = { "B", "KB", "MB", "GB" };
+        int i = 0;
+        double size = bytes;
+        while (size >= 1024 && i < s.Length - 1) { size /= 1024; i++; }
+        return $"{size:0.#} {s[i]}";
+    }
+}

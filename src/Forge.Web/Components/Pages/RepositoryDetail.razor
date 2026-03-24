@@ -1,0 +1,179 @@
+@page "/{Owner}/{Name}"
+@inject IRepositoryService RepositoryService
+@inject IGitService GitService
+@inject NavigationManager Navigation
+
+<PageTitle>@(repo?.Owner)/@(repo?.Name) - Forge</PageTitle>
+
+@if (repo == null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <div class="repo-header">
+        <h1>
+            <a href="/@repo.Owner">@repo.Owner</a> / <strong>@repo.Name</strong>
+            @if (repo.IsPrivate)
+            {
+                <span class="badge">Private</span>
+            }
+        </h1>
+        @if (!string.IsNullOrEmpty(repo.Description))
+        {
+            <p class="description">@repo.Description</p>
+        }
+    </div>
+
+    <div class="clone-box">
+        <h3>Clone</h3>
+        <code style="display: block; background: #0d1117; padding: 0.5rem 0.75rem; border-radius: 4px; font-family: monospace; font-size: 0.875rem;">@($"git clone http://{GetBaseUrl()}/{repo.Owner}/{repo.Name}.git")</code>
+        
+        <h3 style="margin-top: 1rem;">Push an existing repository</h3>
+        <div style="background: #0d1117; padding: 0.5rem 0.75rem; border-radius: 4px; font-family: monospace; font-size: 0.875rem; white-space: pre-wrap;">@GetPushCommands()</div>
+    </div>
+
+    <div class="tabs">
+        <button class="tab @(tab == "files" ? "active" : "")" @onclick='() => tab = "files"'>Files</button>
+        <button class="tab @(tab == "commits" ? "active" : "")" @onclick='() => tab = "commits"'>Commits</button>
+        <button class="tab @(tab == "branches" ? "active" : "")" @onclick='() => tab = "branches"'>Branches</button>
+    </div>
+
+    @if (tab == "files")
+    {
+        @if (files == null || !files.Any())
+        {
+            <div class="empty-state">
+                <p>Empty repository</p>
+                <p style="font-size: 0.875rem; color: #8b949e;">Push some code to get started!</p>
+            </div>
+        }
+        else
+        {
+            <table class="file-list">
+                <tbody>
+                    @foreach (var f in files)
+                    {
+                        <tr>
+                            <td class="icon">@(f.Type == TreeEntryType.Directory ? "📁" : "📄")</td>
+                            <td class="name">
+                                @if (f.Type == TreeEntryType.Directory)
+                                {
+                                    <a href="/@repo.Owner/@repo.Name/tree/@repo.DefaultBranch/@f.Path">@f.Name</a>
+                                }
+                                else
+                                {
+                                    <a href="/@repo.Owner/@repo.Name/blob/@repo.DefaultBranch/@f.Path">@f.Name</a>
+                                }
+                            </td>
+                            <td class="size">@(f.Size.HasValue ? FormatSize(f.Size.Value) : "")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    }
+    else if (tab == "commits")
+    {
+        @if (commitList == null || !commitList.Any())
+        {
+            <p class="empty-state">No commits yet</p>
+        }
+        else
+        {
+            @foreach (var c in commitList)
+            {
+                <div class="commit">
+                    <div class="commit-message">
+                        <a href="/@repo.Owner/@repo.Name/commit/@c.Sha">@c.Message.Split('\n')[0]</a>
+                    </div>
+                    <div class="commit-meta">
+                        <span>@c.Author</span>
+                        <span>committed @RelativeTime(c.AuthorDate)</span>
+                        <code>@c.Sha.Substring(0, 7)</code>
+                    </div>
+                </div>
+            }
+        }
+    }
+    else if (tab == "branches")
+    {
+        @if (branchList == null || !branchList.Any())
+        {
+            <p class="empty-state">No branches</p>
+        }
+        else
+        {
+            @foreach (var b in branchList)
+            {
+                <div class="branch">
+                    <span>🌿</span>
+                    <a href="/@repo.Owner/@repo.Name/tree/@b.Name">@b.Name</a>
+                    @if (b.IsDefault)
+                    {
+                        <span class="badge">default</span>
+                    }
+                    <span class="branch-meta">Updated @RelativeTime(b.LastCommitDate ?? DateTime.MinValue)</span>
+                </div>
+            }
+        }
+    }
+}
+
+@code {
+    [Parameter] public string Owner { get; set; } = "";
+    [Parameter] public string Name { get; set; } = "";
+
+    private Repository? repo;
+    private IEnumerable<BranchInfo>? branchList;
+    private IEnumerable<TreeNode>? files;
+    private IEnumerable<CommitInfo>? commitList;
+    private string tab = "files";
+
+    protected override async Task OnInitializedAsync()
+    {
+        repo = await RepositoryService.GetByOwnerAndNameAsync(Owner, Name);
+        if (repo != null)
+        {
+            branchList = await GitService.GetBranchesAsync(repo);
+            files = await GitService.GetTreeAsync(repo, repo.DefaultBranch);
+            commitList = await GitService.GetCommitsAsync(repo, repo.DefaultBranch);
+        }
+    }
+
+    private string GetBaseUrl()
+    {
+        var uri = Navigation.BaseUri;
+        if (uri.StartsWith("https://")) return uri[8..^1];
+        if (uri.StartsWith("http://")) return uri[7..^1];
+        return uri.TrimEnd('/');
+    }
+
+    private string GetPushCommands()
+    {
+        var baseUrl = GetBaseUrl();
+        return $"git remote add origin https://user:token@{baseUrl}/{repo!.Owner}/{repo!.Name}.git\n" +
+               $"git branch -M main\n" +
+               $"git push -u origin main";
+    }
+
+    private static string FormatSize(long bytes)
+    {
+        string[] s = { "B", "KB", "MB", "GB" };
+        int i = 0;
+        double size = bytes;
+        while (size >= 1024 && i < s.Length - 1) { size /= 1024; i++; }
+        return $"{size:0.#} {s[i]}";
+    }
+
+    private static string RelativeTime(DateTime date)
+    {
+        var span = DateTime.UtcNow - date;
+        if (span.TotalDays > 365) return $"{(int)(span.TotalDays / 365)}y";
+        if (span.TotalDays > 30) return $"{(int)(span.TotalDays / 30)}mo";
+        if (span.TotalDays > 1) return $"{(int)span.TotalDays}d";
+        if (span.TotalHours > 1) return $"{(int)span.TotalHours}h";
+        if (span.TotalMinutes > 1) return $"{(int)span.TotalMinutes}m";
+        return "now";
+    }
+}

@@ -1,0 +1,55 @@
+@page "/"
+@inject IRepositoryService RepositoryService
+
+<PageTitle>All Repositories - Forge</PageTitle>
+
+<h1 style="margin-bottom: 1.5rem;">Repositories</h1>
+
+@if (repositories == null)
+{
+    <p>Loading...</p>
+}
+else if (!repositories.Any())
+{
+    <div class="card">
+        <p style="text-align: center; color: #8b949e;">No repositories yet.</p>
+        <div style="text-align: center; margin-top: 1rem;">
+            <a href="/repos/new" class="btn-primary">Create your first repository</a>
+        </div>
+    </div>
+}
+else
+{
+    @foreach (var repo in repositories)
+    {
+        <div class="card" style="margin-bottom: 0.5rem; padding: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <a href="/@repo.Owner/@repo.Name" style="font-weight: 600; font-size: 1.1rem;">
+                        @repo.Owner/@repo.Name
+                    </a>
+                    @if (repo.IsPrivate)
+                    {
+                        <span class="badge">Private</span>
+                    }
+                    @if (!string.IsNullOrEmpty(repo.Description))
+                    {
+                        <p style="margin: 0.25rem 0 0 0; color: #8b949e;">@repo.Description</p>
+                    }
+                </div>
+                <div style="color: #8b949e; font-size: 0.875rem;">
+                    Updated @repo.UpdatedAt.ToString("yyyy-MM-dd")
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private IEnumerable<Repository>? repositories;
+
+    protected override async Task OnInitializedAsync()
+    {
+        repositories = await RepositoryService.GetAllAsync();
+    }
+}

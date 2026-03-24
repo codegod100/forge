@@ -1,0 +1,41 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{BF2AAC48-09D6-4179-8091-A1555FC2F3B4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Forge.Core", "src\Forge.Core\Forge.Core.csproj", "{430106C4-18EC-47B3-9B8D-9136695392DB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Forge.Data", "src\Forge.Data\Forge.Data.csproj", "{882441F1-21BB-4062-BF43-6748894A1E43}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Forge.Web", "src\Forge.Web\Forge.Web.csproj", "{3120A4AC-89A0-4A33-996C-F88FE88098E1}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{430106C4-18EC-47B3-9B8D-9136695392DB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{430106C4-18EC-47B3-9B8D-9136695392DB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{430106C4-18EC-47B3-9B8D-9136695392DB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{430106C4-18EC-47B3-9B8D-9136695392DB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{882441F1-21BB-4062-BF43-6748894A1E43}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{882441F1-21BB-4062-BF43-6748894A1E43}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{882441F1-21BB-4062-BF43-6748894A1E43}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{882441F1-21BB-4062-BF43-6748894A1E43}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3120A4AC-89A0-4A33-996C-F88FE88098E1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3120A4AC-89A0-4A33-996C-F88FE88098E1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3120A4AC-89A0-4A33-996C-F88FE88098E1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3120A4AC-89A0-4A33-996C-F88FE88098E1}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{430106C4-18EC-47B3-9B8D-9136695392DB} = {BF2AAC48-09D6-4179-8091-A1555FC2F3B4}
+		{882441F1-21BB-4062-BF43-6748894A1E43} = {BF2AAC48-09D6-4179-8091-A1555FC2F3B4}
+		{3120A4AC-89A0-4A33-996C-F88FE88098E1} = {BF2AAC48-09D6-4179-8091-A1555FC2F3B4}
+	EndGlobalSection
+EndGlobal

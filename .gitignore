@@ -1,0 +1,20 @@
+# Build outputs
+bin/
+obj/
+*.dll
+*.pdb
+*.exe
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Git repositories storage
+src/Forge.Web/repositories/
