@@ -50,21 +50,40 @@ public class GitService : IGitService
         if (!Directory.Exists(fullPath))
             return [];
         
-        using var repo = new LibGit2SharpRepository(fullPath);
-        
-        var branches = repo.Branches
-            .Where(b => !b.IsRemote || b.RemoteName == "origin")
-            .Select(b => new BranchInfo
+        try
+        {
+            using var repo = new LibGit2SharpRepository(fullPath);
+            
+            var result = new List<BranchInfo>();
+            foreach (var b in repo.Branches)
             {
-                Name = b.FriendlyName,
-                HeadSha = b.Tip?.Sha ?? "",
-                IsDefault = b.FriendlyName == repository.DefaultBranch,
-                LastCommitDate = b.Tip?.Author.When.DateTime,
-                LastCommitMessage = b.Tip?.MessageShort
-            })
-            .OrderByDescending(b => b.LastCommitDate);
-        
-        return await Task.FromResult(branches);
+                if (b.IsRemote && b.RemoteName != "origin")
+                    continue;
+                
+                try
+                {
+                    result.Add(new BranchInfo
+                    {
+                        Name = b.FriendlyName,
+                        HeadSha = b.Tip?.Sha ?? "",
+                        IsDefault = b.FriendlyName == repository.DefaultBranch,
+                        LastCommitDate = b.Tip?.Author.When.DateTime,
+                        LastCommitMessage = b.Tip?.MessageShort
+                    });
+                }
+                catch
+                {
+                    // Skip branches that cause errors
+                }
+            }
+            
+            return await Task.FromResult(result.OrderByDescending(b => b.LastCommitDate));
+        }
+        catch (LibGit2SharpException ex)
+        {
+            Console.WriteLine($"[Forge] Git error in GetBranchesAsync: {ex.Message}");
+            return [];
+        }
     }
 
     public async Task<BranchInfo?> GetBranchAsync(Models.Repository repository, string branchName)
@@ -73,20 +92,28 @@ public class GitService : IGitService
         if (!Directory.Exists(fullPath))
             return null;
         
-        using var repo = new LibGit2SharpRepository(fullPath);
-        var branch = repo.Branches[branchName];
-        
-        if (branch == null)
-            return null;
-        
-        return await Task.FromResult(new BranchInfo
+        try
         {
-            Name = branch.FriendlyName,
-            HeadSha = branch.Tip?.Sha ?? "",
-            IsDefault = branch.FriendlyName == repository.DefaultBranch,
-            LastCommitDate = branch.Tip?.Author.When.DateTime,
-            LastCommitMessage = branch.Tip?.MessageShort
-        });
+            using var repo = new LibGit2SharpRepository(fullPath);
+            var branch = repo.Branches[branchName];
+            
+            if (branch == null)
+                return null;
+            
+            return await Task.FromResult(new BranchInfo
+            {
+                Name = branch.FriendlyName,
+                HeadSha = branch.Tip?.Sha ?? "",
+                IsDefault = branch.FriendlyName == repository.DefaultBranch,
+                LastCommitDate = branch.Tip?.Author.When.DateTime,
+                LastCommitMessage = branch.Tip?.MessageShort
+            });
+        }
+        catch (LibGit2SharpException ex)
+        {
+            Console.WriteLine($"[Forge] Git error in GetBranchAsync: {ex.Message}");
+            return null;
+        }
     }
 
     public async Task<BranchInfo?> GetDefaultBranchAsync(Models.Repository repository)
@@ -193,29 +220,38 @@ public class GitService : IGitService
         if (!Directory.Exists(fullPath))
             return [];
         
-        using var repo = new LibGit2SharpRepository(fullPath);
-        
-        var gitBranch = repo.Branches[branch];
-        if (gitBranch == null)
+        try
+        {
+            using var repo = new LibGit2SharpRepository(fullPath);
+            
+            var gitBranch = repo.Branches[branch];
+            if (gitBranch == null)
+                return [];
+            
+            var commits = gitBranch.Commits
+                .Skip(skip)
+                .Take(take)
+                .Select(c => new CommitInfo
+                {
+                    Sha = c.Sha,
+                    Message = c.Message,
+                    Author = c.Author.Name,
+                    AuthorEmail = c.Author.Email,
+                    AuthorDate = c.Author.When.DateTime,
+                    Committer = c.Committer.Name,
+                    CommitterEmail = c.Committer.Email,
+                    CommitterDate = c.Committer.When.DateTime,
+                    ParentSha = c.Parents.FirstOrDefault()?.Sha
+                })
+                .ToList();
+            
+            return await Task.FromResult(commits);
+        }
+        catch (LibGit2SharpException ex)
+        {
+            Console.WriteLine($"[Forge] Git error in GetCommitsAsync: {ex.Message}");
             return [];
-        
-        var commits = gitBranch.Commits
-            .Skip(skip)
-            .Take(take)
-            .Select(c => new CommitInfo
-            {
-                Sha = c.Sha,
-                Message = c.Message,
-                Author = c.Author.Name,
-                AuthorEmail = c.Author.Email,
-                AuthorDate = c.Author.When.DateTime,
-                Committer = c.Committer.Name,
-                CommitterEmail = c.Committer.Email,
-                CommitterDate = c.Committer.When.DateTime,
-                ParentSha = c.Parents.FirstOrDefault()?.Sha
-            });
-        
-        return await Task.FromResult(commits);
+        }
     }
 
     public async Task<CommitDetail?> GetCommitAsync(Models.Repository repository, string sha)
