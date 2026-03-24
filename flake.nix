@@ -33,7 +33,6 @@
           runtimeInputs = [ flyctl ];
           text = ''
             # shellcheck source=/dev/null
-            # Load local .env if exists
             if [ -f .env ]; then
               set -a
               source .env
@@ -45,26 +44,6 @@
               exit 1
             fi
 
-            password_file="''${FORGE_ADMIN_PASSWORD_FILE:-''${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/agenix/forge-admin-password}"
-            if [ ! -f "$password_file" ]; then
-              echo "Forge admin password file not found: $password_file"
-              exit 1
-            fi
-
-            password="$(tr -d '\n' < "$password_file")"
-            if [ -z "$password" ]; then
-              echo "Forge admin password file is empty: $password_file"
-              exit 1
-            fi
-
-            # Stage secrets without deploying
-            fly secrets set -a "$FLY_APP" --stage Auth__Password="$password"
-            fly secrets set -a "$FLY_APP" --stage Auth__Username=admin
-            fly secrets set -a "$FLY_APP" --stage Database__Path=/data/forge.db
-            fly secrets set -a "$FLY_APP" --stage Repositories__Root=/data/repositories
-            fly secrets set -a "$FLY_APP" --stage ASPNETCORE_ENVIRONMENT=Production
-
-            # Deploy with staged secrets
             fly deploy -a "$FLY_APP"
           '';
         };
