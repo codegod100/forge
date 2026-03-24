@@ -1,6 +1,7 @@
 @page "/{Owner}/{Name}/commit/{Sha}"
 @inject IRepositoryService RepositoryService
 @inject IGitService GitService
+@using Forge.Core.Models
 
 <PageTitle>@(commit?.Sha[..7]) - @Owner/@Name - Forge</PageTitle>
 
