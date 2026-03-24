@@ -2,6 +2,7 @@
 @page "/{Owner}/{Name}/settings"
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Web
 @using Microsoft.JSInterop
 @inject IRepositoryService RepositoryService
 @inject IGitService GitService
@@ -61,20 +62,41 @@ else
         }
         else
         {
+            @if (lastCommit != null)
+            {
+                <div class="last-commit">
+                    <a href="/@repo.Owner/@repo.Name/commit/@lastCommit.Sha" class="commit-message">@lastCommit.Message.Split('\n')[0]</a>
+                    <div class="commit-meta">
+                        <span><strong>@lastCommit.Author</strong></span>
+                        <span>committed @RelativeTime(lastCommit.AuthorDate)</span>
+                        <code>@lastCommit.Sha.Substring(0, 7)</code>
+                    </div>
+                </div>
+            }
+
+            <div class="file-search-container">
+                <input type="text" 
+                       class="file-search-input" 
+                       placeholder="Search files (press 't')" 
+                       @bind="fileSearchQuery" 
+                       @bind:event="oninput" 
+                       @onkeydown="HandleSearchKeydown" />
+            </div>
+
             <table class="file-list">
                 <tbody>
-                    @foreach (var f in files)
+                    @foreach (var f in filteredFiles)
                     {
                         <tr>
                             <td class="icon">@(f.Type == TreeEntryType.Directory ? "📁" : "📄")</td>
                             <td class="name">
                                 @if (f.Type == TreeEntryType.Directory)
                                 {
-                                    <a href="/@repo.Owner/@repo.Name/tree/@repo.DefaultBranch/@f.Path">@f.Name</a>
+                                    <a href="/@repo.Owner/@repo.Name/tree/@repo.DefaultBranch/@f.Path">@HighlightMatch(f.Name, fileSearchQuery)</a>
                                 }
                                 else
                                 {
-                                    <a href="/@repo.Owner/@repo.Name/blob/@repo.DefaultBranch/@f.Path">@f.Name</a>
+                                    <a href="/@repo.Owner/@repo.Name/blob/@repo.DefaultBranch/@f.Path">@HighlightMatch(f.Name, fileSearchQuery)</a>
                                 }
                             </td>
                             <td class="size">@(f.Size.HasValue ? FormatSize(f.Size.Value) : "")</td>
@@ -82,6 +104,11 @@ else
                     }
                 </tbody>
             </table>
+
+            @if (files.Any() && !filteredFiles.Any() && !string.IsNullOrEmpty(fileSearchQuery))
+            {
+                <p class="empty-state">No files match your search</p>
+            }
 
             @if (!string.IsNullOrEmpty(readmeHtml.Value))
             {
@@ -202,6 +229,10 @@ else
     private IEnumerable<BranchInfo>? branchList;
     private IEnumerable<TreeNode>? files;
     private IEnumerable<CommitInfo>? commitList;
+    private CommitInfo? lastCommit;
+    private IEnumerable<TreeNode> filteredFiles => string.IsNullOrEmpty(fileSearchQuery) 
+        ? (files ?? []) 
+        : (files ?? []).Where(f => f.Name.Contains(fileSearchQuery, StringComparison.OrdinalIgnoreCase));
     private MarkupString readmeHtml;
     private string? readmeName;
     private string? currentUser;
@@ -209,6 +240,7 @@ else
     private bool isPrivate;
     private string? message;
     private string? error;
+    private string fileSearchQuery = "";
     private bool IsOwner => repo != null && string.Equals(currentUser, repo.Owner, StringComparison.Ordinal);
     private bool IsSettingsRoute => Navigation.ToBaseRelativePath(Navigation.Uri).Equals($"{Owner}/{Name}/settings", StringComparison.OrdinalIgnoreCase);
     private string tab => IsSettingsRoute ? "settings" : Tab ?? "files";
@@ -227,6 +259,7 @@ else
             branchList = await GitService.GetBranchesAsync(repo);
             files = await GitService.GetTreeAsync(repo, repo.DefaultBranch);
             commitList = await GitService.GetCommitsAsync(repo, repo.DefaultBranch);
+            lastCommit = commitList?.FirstOrDefault();
             description = repo.Description;
             isPrivate = repo.IsPrivate;
             await LoadReadmeAsync();
@@ -235,10 +268,47 @@ else
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("forge.initFileSearch", DotNetObjectReference.Create(this));
+        }
+        
         if (!string.IsNullOrEmpty(readmeHtml.Value))
         {
             await JS.InvokeVoidAsync("forge.highlightCodeBlocks");
         }
+    }
+
+    [JSInvokable]
+    public void FocusFileSearch()
+    {
+        fileSearchQuery = "";
+        StateHasChanged();
+    }
+
+    private void HandleSearchKeydown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            fileSearchQuery = "";
+            StateHasChanged();
+        }
+    }
+
+    private MarkupString HighlightMatch(string text, string query)
+    {
+        if (string.IsNullOrEmpty(query))
+            return new MarkupString(System.Web.HttpUtility.HtmlEncode(text));
+        
+        var index = text.IndexOf(query, StringComparison.OrdinalIgnoreCase);
+        if (index < 0)
+            return new MarkupString(System.Web.HttpUtility.HtmlEncode(text));
+        
+        var before = System.Web.HttpUtility.HtmlEncode(text[..index]);
+        var match = System.Web.HttpUtility.HtmlEncode(text.Substring(index, query.Length));
+        var after = System.Web.HttpUtility.HtmlEncode(text[(index + query.Length)..]);
+        
+        return new MarkupString($"{before}<mark>{match}</mark>{after}");
     }
 
     private string GetBaseUrl()
