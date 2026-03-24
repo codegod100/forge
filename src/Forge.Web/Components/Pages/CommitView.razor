@@ -33,15 +33,29 @@ else
 
     @if (commit.Changes?.Any() == true)
     {
-        <div class="change-list">
-            @foreach (var change in commit.Changes)
-            {
-                <div class="change">
+        @foreach (var change in commit.Changes)
+        {
+            <div class="diff-file">
+                <div class="diff-header">
                     <span class="change-type @change.ChangeType.ToString().ToLower()">@change.ChangeType.ToString()[0]</span>
-                    <a href="/@repo.Owner/@repo.Name/blob/@repo.DefaultBranch/@change.Path">@change.Path</a>
+                    <a href="/@repo.Owner/@repo.Name/blob/@commit.Sha/@change.Path">@change.Path</a>
+                    <span class="diff-stats">
+                        @if (change.Additions > 0)
+                        {
+                            <span class="additions">+@change.Additions</span>
+                        }
+                        @if (change.Deletions > 0)
+                        {
+                            <span class="deletions">-@change.Deletions</span>
+                        }
+                    </span>
                 </div>
-            }
-        </div>
+                @if (!string.IsNullOrEmpty(change.Diff))
+                {
+                    <pre class="diff-content">@change.Diff</pre>
+                }
+            </div>
+        }
     }
 }
 

@@ -30,6 +30,7 @@ public class FileChange
     public required ChangeType ChangeType { get; set; }
     public int Additions { get; set; }
     public int Deletions { get; set; }
+    public string? Diff { get; set; }
 }
 
 public enum ChangeType

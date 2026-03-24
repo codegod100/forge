@@ -272,49 +272,36 @@ public class GitService : IGitService
         var parent = commit.Parents.FirstOrDefault();
         if (parent != null)
         {
-            var diff = repo.Diff.Compare<TreeChanges>(parent.Tree, commit.Tree);
+            var diff = repo.Diff.Compare<Patch>(parent.Tree, commit.Tree);
             
-            foreach (var added in diff.Added)
+            foreach (var patchEntry in diff)
             {
+                var changeType = patchEntry.Status switch
+                {
+                    ChangeKind.Added => ChangeType.Added,
+                    ChangeKind.Deleted => ChangeType.Deleted,
+                    ChangeKind.Modified => ChangeType.Modified,
+                    ChangeKind.Renamed => ChangeType.Renamed,
+                    _ => ChangeType.Modified
+                };
+                
+                // Count additions and deletions from patch
+                var patch = patchEntry.Patch ?? "";
+                var additions = 0;
+                var deletions = 0;
+                foreach (var line in patch.Split('\n'))
+                {
+                    if (line.StartsWith('+') && !line.StartsWith("++")) additions++;
+                    else if (line.StartsWith('-') && !line.StartsWith("--")) deletions++;
+                }
+                
                 changes.Add(new FileChange
                 {
-                    Path = added.Path,
-                    ChangeType = ChangeType.Added,
-                    Additions = 0,
-                    Deletions = 0
-                });
-            }
-            
-            foreach (var modified in diff.Modified)
-            {
-                changes.Add(new FileChange
-                {
-                    Path = modified.Path,
-                    ChangeType = ChangeType.Modified,
-                    Additions = 0,
-                    Deletions = 0
-                });
-            }
-            
-            foreach (var deleted in diff.Deleted)
-            {
-                changes.Add(new FileChange
-                {
-                    Path = deleted.Path,
-                    ChangeType = ChangeType.Deleted,
-                    Additions = 0,
-                    Deletions = 0
-                });
-            }
-            
-            foreach (var renamed in diff.Renamed)
-            {
-                changes.Add(new FileChange
-                {
-                    Path = renamed.Path,
-                    ChangeType = ChangeType.Renamed,
-                    Additions = 0,
-                    Deletions = 0
+                    Path = patchEntry.Path,
+                    ChangeType = changeType,
+                    Additions = additions,
+                    Deletions = deletions,
+                    Diff = patch
                 });
             }
         }
@@ -323,7 +310,7 @@ public class GitService : IGitService
             // Initial commit - all files are added
             foreach (var entry in commit.Tree)
             {
-                changes.AddRange(GetAllFiles(entry, ""));
+                changes.AddRange(GetAllFilesWithContent(entry, "", commit));
             }
         }
         
@@ -388,6 +375,29 @@ public class GitService : IGitService
             Mode.SymbolicLink => TreeEntryType.Symlink,
             _ => TreeEntryType.File
         };
+    }
+
+    private static IEnumerable<FileChange> GetAllFilesWithContent(TreeEntry entry, string basePath, LibGit2Sharp.Commit commit)
+    {
+        var path = string.IsNullOrEmpty(basePath) ? entry.Name : $"{basePath}/{entry.Name}";
+        
+        if (entry.Target is Tree tree)
+        {
+            return tree.SelectMany(e => GetAllFilesWithContent(e, path, commit));
+        }
+        
+        // Get file content for initial commit diff
+        var content = entry.Target is Blob blob ? blob.GetContentText() : "";
+        var lines = content.Split('\n').Length;
+        
+        return [new FileChange
+        {
+            Path = path,
+            ChangeType = ChangeType.Added,
+            Additions = lines,
+            Deletions = 0,
+            Diff = string.IsNullOrEmpty(content) ? null : content.Split('\n').Select(l => $"+{l}").Aggregate((a, b) => $"{a}\n{b}")
+        }];
     }
 
     private static IEnumerable<FileChange> GetAllFiles(TreeEntry entry, string basePath)

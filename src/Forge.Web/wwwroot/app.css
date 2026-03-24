@@ -598,6 +598,63 @@ a:hover {
     color: #8b949e;
 }
 
+/* Diff display */
+.diff-file {
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    overflow: hidden;
+}
+
+.diff-header {
+    background: #161b22;
+    padding: 0.75rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    border-bottom: 1px solid #30363d;
+}
+
+.diff-header .change-type {
+    width: 1.5rem;
+    height: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.diff-header a {
+    color: #58a6ff;
+    flex: 1;
+}
+
+.diff-stats {
+    font-size: 0.75rem;
+    font-family: 'SF Mono', Monaco, monospace;
+}
+
+.diff-stats .additions {
+    color: #3fb950;
+}
+
+.diff-stats .deletions {
+    color: #f85149;
+}
+
+.diff-content {
+    background: #0d1117;
+    overflow-x: auto;
+    margin: 0;
+    padding: 0.75rem 1rem;
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    white-space: pre;
+}
+
 /* Branch List */
 .branch {
     border: 1px solid #30363d;
