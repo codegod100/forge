@@ -133,10 +133,13 @@ a:hover {
     cursor: pointer;
     border-bottom: 2px solid transparent;
     margin-bottom: -1px;
+    text-decoration: none;
+    display: inline-block;
 }
 
 .tab:hover {
     color: #f0f6fc;
+    text-decoration: none;
 }
 
 .tab.active {

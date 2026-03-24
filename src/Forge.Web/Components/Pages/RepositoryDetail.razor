@@ -1,9 +1,8 @@
 @page "/{Owner}/{Name}"
-@using static Microsoft.AspNetCore.Components.Web.RenderMode
-@attribute [InteractiveServer]
 @inject IRepositoryService RepositoryService
 @inject IGitService GitService
 @inject NavigationManager Navigation
+@using Microsoft.AspNetCore.WebUtilities
 
 <PageTitle>@(repo?.Owner)/@(repo?.Name) - Forge</PageTitle>
 
@@ -36,9 +35,9 @@ else
     </div>
 
     <div class="tabs">
-        <button type="button" class="tab @(tab == "files" ? "active" : "")" @onclick="ShowFiles">Files</button>
-        <button type="button" class="tab @(tab == "commits" ? "active" : "")" @onclick="ShowCommits">Commits</button>
-        <button type="button" class="tab @(tab == "branches" ? "active" : "")" @onclick="ShowBranches">Branches</button>
+        <a href="/@Owner/@Name?tab=files" class="tab @(tab == "files" ? "active" : "")">Files</a>
+        <a href="/@Owner/@Name?tab=commits" class="tab @(tab == "commits" ? "active" : "")">Commits</a>
+        <a href="/@Owner/@Name?tab=branches" class="tab @(tab == "branches" ? "active" : "")">Branches</a>
     </div>
 
     @if (tab == "files")
@@ -132,12 +131,16 @@ else
     private IEnumerable<CommitInfo>? commitList;
     private string tab = "files";
 
-    private void ShowFiles() { tab = "files"; }
-    private void ShowCommits() { tab = "commits"; }
-    private void ShowBranches() { tab = "branches"; }
-
     protected override async Task OnInitializedAsync()
     {
+        // Parse query string for tab
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+        QueryHelpers.ParseQuery(uri.Query).TryGetValue("tab", out var tabParam);
+        if (!string.IsNullOrEmpty(tabParam))
+        {
+            tab = tabParam.ToString();
+        }
+
         repo = await RepositoryService.GetByOwnerAndNameAsync(Owner, Name);
         if (repo != null)
         {
