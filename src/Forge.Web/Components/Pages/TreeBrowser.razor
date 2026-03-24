@@ -93,13 +93,18 @@ else
 
     private IEnumerable<(string Path, string Name)> GetPathSegments()
     {
-        var segments = Path.Split('/', '\\');
+        if (string.IsNullOrEmpty(Path))
+            return Enumerable.Empty<(string, string)>();
+        
+        var segments = Path.Split('/', '\\', StringSplitOptions.RemoveEmptyEntries);
+        var result = new List<(string, string)>();
         var path = "";
         foreach (var segment in segments)
         {
             path = string.IsNullOrEmpty(path) ? segment : $"{path}/{segment}";
-            yield return (path, segment);
+            result.Add((path, segment));
         }
+        return result;
     }
 
     private static string FormatSize(long bytes)
