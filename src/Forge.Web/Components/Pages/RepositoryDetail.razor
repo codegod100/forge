@@ -1,8 +1,9 @@
 @page "/{Owner}/{Name}"
+@using static Microsoft.AspNetCore.Components.Web.RenderMode
+@attribute [InteractiveServer]
 @inject IRepositoryService RepositoryService
 @inject IGitService GitService
 @inject NavigationManager Navigation
-@rendermode InteractiveServer
 
 <PageTitle>@(repo?.Owner)/@(repo?.Name) - Forge</PageTitle>
 
@@ -35,9 +36,9 @@ else
     </div>
 
     <div class="tabs">
-        <button class="tab @(tab == "files" ? "active" : "")" @onclick='() => tab = "files"'>Files</button>
-        <button class="tab @(tab == "commits" ? "active" : "")" @onclick='() => tab = "commits"'>Commits</button>
-        <button class="tab @(tab == "branches" ? "active" : "")" @onclick='() => tab = "branches"'>Branches</button>
+        <button class="tab @(tab == "files" ? "active" : "")" @onclick="ShowFiles">Files</button>
+        <button class="tab @(tab == "commits" ? "active" : "")" @onclick="ShowCommits">Commits</button>
+        <button class="tab @(tab == "branches" ? "active" : "")" @onclick="ShowBranches">Branches</button>
     </div>
 
     @if (tab == "files")
@@ -130,6 +131,10 @@ else
     private IEnumerable<TreeNode>? files;
     private IEnumerable<CommitInfo>? commitList;
     private string tab = "files";
+
+    private void ShowFiles() { tab = "files"; }
+    private void ShowCommits() { tab = "commits"; }
+    private void ShowBranches() { tab = "branches"; }
 
     protected override async Task OnInitializedAsync()
     {
