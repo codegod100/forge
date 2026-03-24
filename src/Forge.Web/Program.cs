@@ -130,30 +130,10 @@ app.MapPost("/auth/logout", async (HttpContext context) =>
 });
 
 // Git Smart HTTP endpoints
-app.MapGet("/{owner}/{repo}.git/info/refs", async (HttpContext context, string owner, string repo, 
+app.MapMethods("/{owner}/{repo}.git/{**rest}", new[] { "GET", "POST" }, async (HttpContext context, string owner, string repo,
     [FromServices] GitHttpMiddleware git) =>
 {
-    var service = context.Request.Query["service"].ToString();
-    if (service == "git-upload-pack" || service == "git-receive-pack")
-    {
-        await git.HandleInfoRefsAsync(context, owner, repo, service);
-    }
-    else
-    {
-        context.Response.StatusCode = 400;
-    }
-});
-
-app.MapPost("/{owner}/{repo}.git/git-upload-pack", async (HttpContext context, string owner, string repo,
-    [FromServices] GitHttpMiddleware git) =>
-{
-    await git.HandleServiceAsync(context, owner, repo, "git-upload-pack");
-});
-
-app.MapPost("/{owner}/{repo}.git/git-receive-pack", async (HttpContext context, string owner, string repo,
-    [FromServices] GitHttpMiddleware git) =>
-{
-    await git.HandleServiceAsync(context, owner, repo, "git-receive-pack");
+    await git.HandleAsync(context, owner, repo);
 });
 
 app.Run();

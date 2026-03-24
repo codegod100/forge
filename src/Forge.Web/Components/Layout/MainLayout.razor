@@ -7,18 +7,31 @@
         <nav class="nav">
             <AuthorizeView>
                 <Authorized>
-                    <span class="nav-user">@context.User.Identity?.Name</span>
                     <a href="/repos/new" class="btn-primary">+ New Repo</a>
-                    <form method="post" action="/auth/logout" class="inline-form">
-                        <AntiforgeryToken />
-                        <button type="submit" class="btn-secondary">Log Out</button>
-                    </form>
+                </Authorized>
+            </AuthorizeView>
+        </nav>
+        <div class="nav-user-menu">
+            <AuthorizeView>
+                <Authorized>
+                    <div class="avatar-dropdown">
+                        <button class="nav-avatar" type="button" title="@context.User.Identity?.Name">
+                            @context.User.Identity?.Name?[0].ToString().ToUpper()
+                        </button>
+                        <div class="avatar-dropdown-content">
+                            <span class="dropdown-username">@context.User.Identity?.Name</span>
+                            <form method="post" action="/auth/logout">
+                                <AntiforgeryToken />
+                                <button type="submit" class="dropdown-item">Log Out</button>
+                            </form>
+                        </div>
+                    </div>
                 </Authorized>
                 <NotAuthorized>
                     <a href="/login" class="btn-secondary">Log In</a>
                 </NotAuthorized>
             </AuthorizeView>
-        </nav>
+        </div>
     </header>
     <main class="content">
         @Body

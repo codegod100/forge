@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Text;
 using Forge.Core.Services;
 using Forge.Data.Services;
@@ -21,22 +22,12 @@ public class GitHttpMiddleware
         _repositoriesRoot = repositoriesRoot;
     }
 
-    public async Task HandleInfoRefsAsync(HttpContext context, string owner, string repoName, string service)
+    public async Task HandleAsync(HttpContext context, string owner, string repoName)
     {
-        var repoPath = Path.Combine(_repositoriesRoot, owner, $"{repoName}.git");
-        Console.WriteLine($"[Git] InfoRefs: {repoPath}");
-
-        var repo = await EnsureRepositoryForPushAsync(context, owner, repoName, service);
+        var service = GetRequestedService(context);
+        var repo = await EnsureRepositoryForRequestAsync(context, owner, repoName, service);
         if (repo == null)
         {
-            return;
-        }
-
-        if (repo == null)
-        {
-            Console.WriteLine($"[Git] Repo not in database: {owner}/{repoName}");
-            context.Response.StatusCode = 404;
-            await context.Response.WriteAsync("Repository not found in database");
             return;
         }
 
@@ -47,53 +38,10 @@ public class GitHttpMiddleware
             return;
         }
 
-        context.Response.ContentType = $"application/x-{service}-advertisement";
-        context.Response.Headers.CacheControl = "no-cache";
-
-        // Write header
-        await context.Response.Body.WriteAsync(FormatPacketLine($"# service={service}\n"));
-        await context.Response.Body.WriteAsync(Encoding.UTF8.GetBytes("0000"));
-
-        // Run git and write output directly to response
-        await RunGitToStreamAsync(repoPath, service, "--advertise-refs", context.Response.Body);
+        await RunGitHttpBackendAsync(context, owner, repoName);
     }
 
-    public async Task HandleServiceAsync(HttpContext context, string owner, string repoName, string service)
-    {
-        var repoPath = Path.Combine(_repositoriesRoot, owner, $"{repoName}.git");
-
-        var repo = await EnsureRepositoryForPushAsync(context, owner, repoName, service);
-        if (repo == null)
-        {
-            return;
-        }
-
-        if (repo == null)
-        {
-            context.Response.StatusCode = 404;
-            await context.Response.WriteAsync("Repository not found in database");
-            return;
-        }
-
-        if ((repo.IsPrivate || service == "git-receive-pack") && !IsAuthenticated(context))
-        {
-            context.Response.StatusCode = 401;
-            context.Response.Headers.WWWAuthenticate = "Basic realm=\"Forge Git\"";
-            return;
-        }
-
-        context.Response.ContentType = $"application/x-{service}-result";
-        context.Response.Headers.CacheControl = "no-cache";
-
-        using var inputMs = new MemoryStream();
-        await context.Request.Body.CopyToAsync(inputMs);
-        var input = inputMs.ToArray();
-
-        var result = await RunGitWithInputAsync(repoPath, service, "--stateless-rpc", input);
-        await context.Response.Body.WriteAsync(result);
-    }
-
-    private async Task<Forge.Core.Models.Repository?> EnsureRepositoryForPushAsync(HttpContext context, string owner, string repoName, string service)
+    private async Task<Forge.Core.Models.Repository?> EnsureRepositoryForRequestAsync(HttpContext context, string owner, string repoName, string? service)
     {
         var repoPath = Path.Combine(_repositoriesRoot, owner, $"{repoName}.git");
         var repo = await _repoService.GetByOwnerAndNameAsync(owner, repoName);
@@ -142,6 +90,27 @@ public class GitHttpMiddleware
         return repo;
     }
 
+    private static string? GetRequestedService(HttpContext context)
+    {
+        if (HttpMethods.IsGet(context.Request.Method))
+        {
+            return context.Request.Query["service"].ToString();
+        }
+
+        var path = context.Request.Path.Value ?? string.Empty;
+        if (path.EndsWith("/git-upload-pack", StringComparison.Ordinal))
+        {
+            return "git-upload-pack";
+        }
+
+        if (path.EndsWith("/git-receive-pack", StringComparison.Ordinal))
+        {
+            return "git-receive-pack";
+        }
+
+        return null;
+    }
+
     private bool IsAuthenticated(HttpContext context)
     {
         var credentials = GetBasicCredentials(context);
@@ -167,21 +136,30 @@ public class GitHttpMiddleware
         }
     }
 
-    private async Task RunGitToStreamAsync(string repoPath, string command, string args, Stream output)
+    private async Task RunGitHttpBackendAsync(HttpContext context, string owner, string repoName)
     {
-        // git-upload-pack -> upload-pack, git-receive-pack -> receive-pack
-        var subcommand = command.Replace("git-", "");
+        var pathInfo = context.Request.Path.Value?[($"/{owner}/{repoName}.git").Length..] ?? string.Empty;
+        if (string.IsNullOrEmpty(pathInfo))
+        {
+            pathInfo = "/";
+        }
+
+        var queryString = context.Request.QueryString.HasValue
+            ? context.Request.QueryString.Value?.TrimStart('?') ?? string.Empty
+            : string.Empty;
+
         var psi = new ProcessStartInfo
         {
             FileName = "git",
-            Arguments = $"{subcommand} {args} \"{repoPath}\"",
+            Arguments = "http-backend",
             RedirectStandardOutput = true,
+            RedirectStandardInput = true,
             RedirectStandardError = true,
             UseShellExecute = false
         };
-        psi.EnvironmentVariables["GIT_HTTP_EXPORT_ALL"] = "1";
+        ApplyGitHttpEnvironment(context, psi, owner, repoName, pathInfo, queryString);
 
-        Console.WriteLine($"[Git] Running: git {subcommand} {args} \"{repoPath}\"");
+        Console.WriteLine($"[Git] Running: git http-backend PATH_INFO=/{owner}/{repoName}.git{pathInfo}");
 
         using var process = Process.Start(psi);
         if (process == null)
@@ -190,52 +168,136 @@ public class GitHttpMiddleware
             return;
         }
 
-        // Copy stdout directly to output stream
-        await process.StandardOutput.BaseStream.CopyToAsync(output);
-        
-        // Read any errors
-        var error = await process.StandardError.ReadToEndAsync();
+        var stdoutTask = CopyToMemoryAsync(process.StandardOutput.BaseStream);
+        var stderrTask = process.StandardError.ReadToEndAsync();
+        var inputTask = CopyRequestBodyAsync(context, process);
+
+        await inputTask;
+        var output = await stdoutTask;
+        var error = await stderrTask;
+        await process.WaitForExitAsync();
+
         if (!string.IsNullOrEmpty(error))
         {
             Console.WriteLine($"[Git] Error: {error}");
         }
 
-        await process.WaitForExitAsync();
         Console.WriteLine($"[Git] Process exited with code {process.ExitCode}");
-    }
-
-    private async Task<byte[]> RunGitWithInputAsync(string repoPath, string command, string args, byte[] input)
-    {
-        var subcommand = command.Replace("git-", "");
-        var psi = new ProcessStartInfo
+        if (process.ExitCode != 0)
         {
-            FileName = "git",
-            Arguments = $"{subcommand} {args} \"{repoPath}\"",
-            RedirectStandardOutput = true,
-            RedirectStandardInput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false
-        };
-        psi.EnvironmentVariables["GIT_HTTP_EXPORT_ALL"] = "1";
+            context.Response.StatusCode = 500;
+            await context.Response.WriteAsync("Git HTTP backend failed");
+            return;
+        }
 
-        using var process = Process.Start(psi);
-        if (process == null)
-            return Array.Empty<byte>();
-
-        await process.StandardInput.BaseStream.WriteAsync(input, 0, input.Length);
-        process.StandardInput.Close();
-
-        using var ms = new MemoryStream();
-        var readTask = process.StandardOutput.BaseStream.CopyToAsync(ms);
-        await process.WaitForExitAsync();
-        await readTask;
-
-        return ms.ToArray();
+        await WriteBackendResponseAsync(context, output);
     }
 
-    private static byte[] FormatPacketLine(string data)
+    private static async Task CopyRequestBodyAsync(HttpContext context, Process process)
     {
-        var length = data.Length + 4;
-        return Encoding.UTF8.GetBytes($"{length:x4}{data}");
+        await context.Request.Body.CopyToAsync(process.StandardInput.BaseStream);
+        await process.StandardInput.BaseStream.FlushAsync();
+        process.StandardInput.Close();
+    }
+
+    private static async Task<byte[]> CopyToMemoryAsync(Stream stream)
+    {
+        using var memory = new MemoryStream();
+        await stream.CopyToAsync(memory);
+        return memory.ToArray();
+    }
+
+    private static async Task WriteBackendResponseAsync(HttpContext context, byte[] output)
+    {
+        var headerTerminatorLength = TryFindHeaderTerminator(output, out var headerEndIndex);
+        if (headerTerminatorLength == 0)
+        {
+            context.Response.StatusCode = 500;
+            await context.Response.WriteAsync("Invalid git HTTP backend response");
+            return;
+        }
+
+        var headerText = Encoding.ASCII.GetString(output, 0, headerEndIndex);
+        var headerLines = headerText.Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries);
+        foreach (var line in headerLines)
+        {
+            var separatorIndex = line.IndexOf(':');
+            if (separatorIndex <= 0) continue;
+
+            var headerName = line[..separatorIndex].Trim();
+            var headerValue = line[(separatorIndex + 1)..].Trim();
+
+            if (string.Equals(headerName, "Status", StringComparison.OrdinalIgnoreCase))
+            {
+                var parts = headerValue.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length > 0 && int.TryParse(parts[0], out var statusCode))
+                {
+                    context.Response.StatusCode = statusCode;
+                }
+                continue;
+            }
+
+            context.Response.Headers[headerName] = headerValue;
+        }
+
+        var bodyStartIndex = headerEndIndex + headerTerminatorLength;
+        var bodyLength = output.Length - bodyStartIndex;
+        if (bodyLength > 0)
+        {
+            await context.Response.Body.WriteAsync(output.AsMemory(bodyStartIndex, bodyLength));
+        }
+    }
+
+    private static int TryFindHeaderTerminator(byte[] data, out int headerEndIndex)
+    {
+        for (var i = 0; i < data.Length - 3; i++)
+        {
+            if (data[i] == '\r' && data[i + 1] == '\n' && data[i + 2] == '\r' && data[i + 3] == '\n')
+            {
+                headerEndIndex = i;
+                return 4;
+            }
+        }
+
+        for (var i = 0; i < data.Length - 1; i++)
+        {
+            if (data[i] == '\n' && data[i + 1] == '\n')
+            {
+                headerEndIndex = i;
+                return 2;
+            }
+        }
+
+        headerEndIndex = -1;
+        return 0;
+    }
+
+    private void ApplyGitHttpEnvironment(HttpContext context, ProcessStartInfo psi, string owner, string repoName, string pathInfo, string queryString)
+    {
+        psi.EnvironmentVariables["GIT_HTTP_EXPORT_ALL"] = "1";
+        psi.EnvironmentVariables["GIT_PROJECT_ROOT"] = _repositoriesRoot;
+        psi.EnvironmentVariables["PATH_INFO"] = $"/{owner}/{repoName}.git{pathInfo}";
+        psi.EnvironmentVariables["REQUEST_METHOD"] = context.Request.Method;
+        psi.EnvironmentVariables["QUERY_STRING"] = queryString;
+        psi.EnvironmentVariables["CONTENT_TYPE"] = context.Request.ContentType ?? string.Empty;
+        psi.EnvironmentVariables["REMOTE_USER"] = GetBasicCredentials(context)?.Username ?? string.Empty;
+        psi.EnvironmentVariables["REMOTE_ADDR"] = context.Connection.RemoteIpAddress?.ToString() ?? string.Empty;
+
+        if (context.Request.ContentLength.HasValue)
+        {
+            psi.EnvironmentVariables["CONTENT_LENGTH"] = context.Request.ContentLength.Value.ToString(CultureInfo.InvariantCulture);
+        }
+
+        foreach (var header in context.Request.Headers)
+        {
+            var envName = $"HTTP_{header.Key.ToUpperInvariant().Replace('-', '_')}";
+            psi.EnvironmentVariables[envName] = header.Value.ToString();
+        }
+
+        var gitProtocol = context.Request.Headers["Git-Protocol"].ToString();
+        if (!string.IsNullOrWhiteSpace(gitProtocol))
+        {
+            psi.EnvironmentVariables["GIT_PROTOCOL"] = gitProtocol;
+        }
     }
 }

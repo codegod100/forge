@@ -18,3 +18,9 @@ obj/
 
 # Git repositories storage
 src/Forge.Web/repositories/
+
+# Secrets (agenix encrypted, but still don't commit)
+secrets/
+
+# Local environment overrides
+.env

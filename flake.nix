@@ -11,7 +11,7 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
         dotnet-sdk = pkgs.dotnetCorePackages.dotnet_9.sdk;
-        railwayCli = pkgs.railway;
+        flyctl = pkgs.flyctl;
 
         runForge = pkgs.writeShellApplication {
           name = "run-forge";
@@ -23,14 +23,28 @@
               exit 1
             fi
             export Auth__PasswordFile="$password_file"
+            echo "Forge starting at: http://localhost:5128"
             exec dotnet run --project src/Forge.Web "$@"
           '';
         };
 
-        deployRailway = pkgs.writeShellApplication {
-          name = "deploy-railway";
-          runtimeInputs = [ railwayCli ];
+        deployFly = pkgs.writeShellApplication {
+          name = "deploy-fly";
+          runtimeInputs = [ flyctl ];
           text = ''
+            # shellcheck source=/dev/null
+            # Load local .env if exists
+            if [ -f .env ]; then
+              set -a
+              source .env
+              set +a
+            fi
+
+            if [ -z "''${FLY_APP:-}" ]; then
+              echo "Error: FLY_APP not set. Create a .env file with FLY_APP=<your-app-name>"
+              exit 1
+            fi
+
             password_file="''${FORGE_ADMIN_PASSWORD_FILE:-''${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/agenix/forge-admin-password}"
             if [ ! -f "$password_file" ]; then
               echo "Forge admin password file not found: $password_file"
@@ -43,33 +57,15 @@
               exit 1
             fi
 
-            variableArgs=()
-            upArgs=()
-            if [ -n "''${RAILWAY_PROJECT:-}" ]; then
-              linkArgs=(--project "$RAILWAY_PROJECT")
-              if [ -n "''${RAILWAY_ENVIRONMENT:-}" ]; then
-                linkArgs+=(--environment "$RAILWAY_ENVIRONMENT")
-              fi
-              railway link "''${linkArgs[@]}"
-              upArgs+=(--project "$RAILWAY_PROJECT")
-            fi
-            if [ -n "''${RAILWAY_ENVIRONMENT:-}" ]; then
-              variableArgs+=(-e "$RAILWAY_ENVIRONMENT")
-              upArgs+=(-e "$RAILWAY_ENVIRONMENT")
-            fi
-            if [ -n "''${RAILWAY_SERVICE:-}" ]; then
-              variableArgs+=(-s "$RAILWAY_SERVICE")
-              upArgs+=(-s "$RAILWAY_SERVICE")
-            fi
+            # Stage secrets without deploying
+            fly secrets set -a "$FLY_APP" --stage Auth__Password="$password"
+            fly secrets set -a "$FLY_APP" --stage Auth__Username=admin
+            fly secrets set -a "$FLY_APP" --stage Database__Path=/data/forge.db
+            fly secrets set -a "$FLY_APP" --stage Repositories__Root=/data/repositories
+            fly secrets set -a "$FLY_APP" --stage ASPNETCORE_ENVIRONMENT=Production
 
-            railway variable set "''${variableArgs[@]}" --skip-deploys Auth__Username=admin
-            railway variable set "''${variableArgs[@]}" --skip-deploys Database__Path=/data/forge.db
-            railway variable set "''${variableArgs[@]}" --skip-deploys Repositories__Root=/data/repositories
-            railway variable set "''${variableArgs[@]}" --skip-deploys ASPNETCORE_ENVIRONMENT=Production
-
-            printf '%s' "$password" | railway variable set "''${variableArgs[@]}" --skip-deploys --stdin Auth__Password
-
-            railway up "''${upArgs[@]}" --detach
+            # Deploy with staged secrets
+            fly deploy -a "$FLY_APP"
           '';
         };
       in
@@ -89,33 +85,34 @@
         };
 
         packages.run-forge = runForge;
-        packages.deploy-railway = deployRailway;
+        packages.deploy-fly = deployFly;
 
         apps.run-forge = {
           type = "app";
           program = "${runForge}/bin/run-forge";
         };
 
-        apps.deploy-railway = {
+        apps.deploy-fly = {
           type = "app";
-          program = "${deployRailway}/bin/deploy-railway";
+          program = "${deployFly}/bin/deploy-fly";
         };
 
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
             dotnet-sdk
             git
-            railwayCli
+            flyctl
             sqlite
+            just
           ];
 
           shellHook = ''
             echo "Forge dev shell"
             echo "Commands:"
-            echo "  nix run .#run-forge          Start the dev server using a decrypted password file"
+            echo "  nix run .#run-forge        Start the dev server using a decrypted password file"
             echo "  dotnet test                Run tests"
             echo "  dotnet build               Build the project"
-            echo "  nix run .#deploy-railway   Deploy to Railway using a decrypted password file"
+            echo "  nix run .#deploy-fly       Deploy to Fly.io using a decrypted password file"
             echo ""
             echo "Git clone/push URLs:"
             echo "  git clone http://localhost:5128/{owner}/{repo}.git"

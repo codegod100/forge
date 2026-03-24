@@ -1,0 +1,19 @@
+# App name and region come from .env (FLY_APP and FLY_REGION)
+# Run: fly apps create <your-app-name>
+# Then create .env with FLY_APP=<your-app-name> and FLY_REGION=<region>
+
+[build]
+
+[env]
+  PORT = "8080"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[mounts]]
+  source = "forge_data"
+  destination = "/data"
