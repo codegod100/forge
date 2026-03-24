@@ -81,6 +81,10 @@ else
                        @bind="fileSearchQuery" 
                        @bind:event="oninput" 
                        @onkeydown="HandleSearchKeydown" />
+                @if (!string.IsNullOrEmpty(fileSearchQuery))
+                {
+                    <button class="file-search-clear" @onclick="ClearFileSearch" title="Clear search">✕</button>
+                }
             </div>
 
             <table class="file-list">
@@ -284,6 +288,11 @@ else
     {
         fileSearchQuery = "";
         StateHasChanged();
+    }
+
+    private void ClearFileSearch()
+    {
+        fileSearchQuery = "";
     }
 
     private void HandleSearchKeydown(KeyboardEventArgs e)

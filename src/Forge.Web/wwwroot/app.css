@@ -831,17 +831,20 @@ input[type="text"]:focus, textarea:focus {
 /* File Search */
 .file-search-container {
     margin-bottom: 1rem;
+    position: relative;
+    display: inline-block;
+    width: 100%;
+    max-width: 400px;
 }
 
 .file-search-input {
     background: #0d1117;
     border: 1px solid #30363d;
     border-radius: 6px;
-    padding: 0.5rem 1rem;
+    padding: 0.5rem 2rem 0.5rem 1rem;
     color: #c9d1d9;
     font-size: 0.875rem;
     width: 100%;
-    max-width: 400px;
 }
 
 .file-search-input:focus {
@@ -851,6 +854,24 @@ input[type="text"]:focus, textarea:focus {
 
 .file-search-input::placeholder {
     color: #8b949e;
+}
+
+.file-search-clear {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    color: #8b949e;
+    cursor: pointer;
+    padding: 0.25rem;
+    font-size: 0.875rem;
+    line-height: 1;
+}
+
+.file-search-clear:hover {
+    color: #f0f6fc;
 }
 
 /* Search highlight */
