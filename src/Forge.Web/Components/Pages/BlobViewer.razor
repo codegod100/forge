@@ -1,0 +1,77 @@
+@page "/{Owner}/{Name}/blob/{Branch}/{*Path}"
+@inject IRepositoryService RepositoryService
+@inject IGitService GitService
+
+<PageTitle>@Path - @Owner/@Name - Forge</PageTitle>
+
+@if (repo == null)
+{
+    <p>Loading...</p>
+}
+else if (file == null)
+{
+    <p>File not found</p>
+}
+else
+{
+    <div class="repo-header">
+        <h1>
+            <a href="/@repo.Owner">@repo.Owner</a> / <strong>@repo.Name</strong>
+        </h1>
+    </div>
+
+    <div class="breadcrumb">
+        <a href="/@repo.Owner/@repo.Name/tree/@Branch">@repo.DefaultBranch</a>
+        @foreach (var part in pathParts.Take(pathParts.Length - 1))
+        {
+            <span>/</span>
+            <a href="/@repo.Owner/@repo.Name/tree/@Branch/@part">@part</a>
+        }
+        <span>/</span>
+        <strong>@System.IO.Path.GetFileName(Path)</strong>
+        @if (file.Size.HasValue)
+        {
+            <span class="file-size">(@FormatSize(file.Size.Value))</span>
+        }
+    </div>
+
+    @if (string.IsNullOrEmpty(file.Content))
+    {
+        <div class="file-content">
+            <em>Binary file</em>
+        </div>
+    }
+    else
+    {
+        <pre class="file-content">@file.Content</pre>
+    }
+}
+
+@code {
+    [Parameter] public string Owner { get; set; } = "";
+    [Parameter] public string Name { get; set; } = "";
+    [Parameter] public string Branch { get; set; } = "";
+    [Parameter] public string? Path { get; set; }
+
+    private Repository? repo;
+    private TreeNode? file;
+    private string[] pathParts => Path?.Split('/', '\\') ?? [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        repo = await RepositoryService.GetByOwnerAndNameAsync(Owner, Name);
+        if (repo != null && !string.IsNullOrEmpty(Path))
+        {
+            file = await GitService.GetFileAsync(repo, Branch, Path);
+        }
+    }
+
+    private static string FormatSize(long bytes)
+    {
+        string[] s = { "B", "KB", "MB", "GB" };
+        int i = 0;
+        double size = bytes;
+        while (size >= 1024 && i < s.Length - 1) { size /= 1024; i++; }
+        return $"{size:0.#} {s[i]}";
+    }
+}

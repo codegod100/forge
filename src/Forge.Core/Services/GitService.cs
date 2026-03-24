@@ -142,7 +142,7 @@ public class GitService : IGitService
                     Name = entry.Name,
                     Path = string.IsNullOrEmpty(path) ? entry.Name : $"{path}/{entry.Name}",
                     Type = MapEntryType(entry.Mode),
-                    Sha = entry.TargetId.Sha,
+                    Sha = entry.Target.Sha,
                     Size = size
                 });
             }
