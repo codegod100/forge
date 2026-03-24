@@ -2,18 +2,6 @@
     box-sizing: border-box;
 }
 
-/* Prevent text selection highlighting on UI elements */
-html, body, .layout {
-    -webkit-user-select: none;
-    user-select: none;
-}
-
-/* Allow text selection in content areas */
-.file-content, .markdown-body, .commit-body, code, pre, input, textarea {
-    -webkit-user-select: text;
-    user-select: text;
-}
-
 /* Remove focus outline, use custom focus styles instead */
 :focus {
     outline: none;
