@@ -1296,3 +1296,4 @@ mark {
     color: #d29922;
     font-size: 0.875rem;
 }
+.passkey-hint { font-size: 0.75rem; color: #8b949e; margin-top: 0.5rem; text-align: center; }

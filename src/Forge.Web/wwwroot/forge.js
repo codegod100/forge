@@ -144,10 +144,16 @@ window.forge.webauthn = {
   authenticate: async (optionsJson) => {
     try {
       const options = window.forge.webauthn.decodeOptions(JSON.parse(optionsJson));
+      console.log('[WebAuthn] Decoded options:', options);
       const assertion = await navigator.credentials.get({ publicKey: options });
+      console.log('[WebAuthn] Got assertion');
       return JSON.stringify(window.forge.webauthn.encodeAssertion(assertion));
     } catch (error) {
-      console.error('WebAuthn authentication error:', error);
+      console.error('[WebAuthn] Authentication error:', error.name, error.message);
+      // User cancelled or no credentials found
+      if (error.name === 'NotAllowedError') {
+        throw new Error('No passkey found or operation was cancelled');
+      }
       throw error;
     }
   },
@@ -159,15 +165,32 @@ window.forge.webauthn = {
   
   // Full sign-in flow
   signIn: async (redirectUrl) => {
+    console.log('[WebAuthn] Starting sign-in flow...');
     try {
       // Get authentication options
+      console.log('[WebAuthn] Fetching options from /auth/passkey/authenticate/start');
       const optionsResp = await fetch('/auth/passkey/authenticate/start');
+      
+      if (!optionsResp.ok) {
+        console.error('[WebAuthn] Options request failed:', optionsResp.status, optionsResp.statusText);
+        return JSON.stringify({ error: `Server error: ${optionsResp.status}` });
+      }
+      
       const optionsJson = await optionsResp.text();
+      console.log('[WebAuthn] Options received:', optionsJson.substring(0, 200));
       
       // Call WebAuthn API
-      const assertionJson = await window.forge.webauthn.authenticate(optionsJson);
+      console.log('[WebAuthn] Calling navigator.credentials.get()');
+      try {
+        var assertionJson = await window.forge.webauthn.authenticate(optionsJson);
+        console.log('[WebAuthn] Assertion received');
+      } catch (authError) {
+        console.error('[WebAuthn] Authentication failed:', authError.message);
+        return JSON.stringify({ error: authError.message });
+      }
       
       // Send assertion to server
+      console.log('[WebAuthn] Sending assertion to /auth/passkey/authenticate/complete');
       const completeResp = await fetch('/auth/passkey/authenticate/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -176,15 +199,17 @@ window.forge.webauthn = {
       });
       
       const result = await completeResp.json();
+      console.log('[WebAuthn] Complete result:', result);
       
       if (result.success) {
-        return redirectUrl;
+        return JSON.stringify({ redirect: redirectUrl });
       } else {
-        return 'error';
+        console.error('[WebAuthn] Authentication failed:', result.error);
+        return JSON.stringify({ error: result.error || 'Authentication failed' });
       }
     } catch (error) {
-      console.error('Passkey sign-in error:', error);
-      return 'error';
+      console.error('[WebAuthn] Sign-in error:', error);
+      return JSON.stringify({ error: error.message || 'Unknown error' });
     }
   },
   
