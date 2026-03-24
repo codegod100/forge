@@ -25,6 +25,17 @@ public class ConfiguredAuthService : IAuthService
 
     public string GetConfiguredUsername() => _options.Username;
 
+    public Task UpdatePasswordAsync(string username, string newPassword)
+    {
+        if (string.IsNullOrWhiteSpace(_options.PasswordFile))
+        {
+            throw new InvalidOperationException("Password file is not configured. Cannot update password.");
+        }
+
+        File.WriteAllText(_options.PasswordFile, newPassword);
+        return Task.CompletedTask;
+    }
+
     private string GetConfiguredPassword()
     {
         if (!string.IsNullOrWhiteSpace(_options.Password))

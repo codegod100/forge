@@ -3,9 +3,15 @@
 }
 
 /* Prevent text selection highlighting on UI elements */
-button, .btn-primary, .tab, a {
+html, body, .layout {
     -webkit-user-select: none;
     user-select: none;
+}
+
+/* Allow text selection in content areas */
+.file-content, .markdown-body, .commit-body, code, pre, input, textarea {
+    -webkit-user-select: text;
+    user-select: text;
 }
 
 /* Remove focus outline, use custom focus styles instead */
@@ -50,6 +56,7 @@ a:hover {
     display: flex;
     align-items: center;
     gap: 2rem;
+    position: relative;
 }
 
 .logo {
@@ -72,6 +79,7 @@ a:hover {
 .nav-user-menu {
     display: flex;
     align-items: center;
+    margin-left: 1rem;
 }
 
 .avatar-dropdown {
@@ -100,24 +108,14 @@ a:hover {
 
 .avatar-dropdown-content {
     display: none;
-    position: absolute;
-    right: 0;
-    top: 100%;
-    padding-top: 0.5rem;
+    position: fixed;
+    right: 1rem;
+    top: 3.25rem;
     background: #161b22;
     border: 1px solid #30363d;
     border-radius: 6px;
     min-width: 150px;
     z-index: 100;
-}
-
-.avatar-dropdown-content::before {
-    content: '';
-    position: absolute;
-    top: 0.25rem;
-    left: 0;
-    right: 0;
-    height: 0.5rem;
 }
 
 .avatar-dropdown:hover .avatar-dropdown-content {
@@ -143,10 +141,13 @@ a:hover {
     font-size: 0.875rem;
     text-align: left;
     cursor: pointer;
+    text-decoration: none;
 }
 
 .dropdown-item:hover {
     background: #21262d;
+    color: #f0f6fc;
+    text-decoration: none;
 }
 
 .nav-user {
@@ -351,8 +352,34 @@ a:hover {
     margin-bottom: 1rem;
 }
 
-.settings-card {
+.settings-container {
     max-width: 640px;
+}
+
+.settings-container h1 {
+    margin-bottom: 1.5rem;
+}
+
+.settings-container h2 {
+    font-size: 1.125rem;
+    margin: 0 0 0.5rem 0;
+}
+
+.settings-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.settings-card h2 {
+    margin: 0 0 0.5rem 0;
+}
+
+.auth-form {
+    display: grid;
+    gap: 1rem;
+    margin-top: 1rem;
 }
 
 .form-help {

@@ -20,6 +20,7 @@
                         </button>
                         <div class="avatar-dropdown-content">
                             <span class="dropdown-username">@context.User.Identity?.Name</span>
+                            <a href="/settings" class="dropdown-item">Account Settings</a>
                             <form method="post" action="/auth/logout">
                                 <AntiforgeryToken />
                                 <button type="submit" class="dropdown-item">Log Out</button>

@@ -4,4 +4,5 @@ public interface IAuthService
 {
     bool ValidateCredentials(string? username, string? password);
     string GetConfiguredUsername();
+    Task UpdatePasswordAsync(string username, string newPassword);
 }

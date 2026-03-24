@@ -1,0 +1,98 @@
+@page "/settings"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using Forge.Web.Auth
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IAuthService AuthService
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Settings - Forge</PageTitle>
+
+<div class="settings-container">
+    <h1>Account Settings</h1>
+
+    @if (Success)
+    {
+        <p class="success-message">Password updated successfully.</p>
+    }
+
+    @if (Error)
+    {
+        <p class="auth-error">@ErrorMessage</p>
+    }
+
+    <div class="settings-card">
+        <h2>Change Password</h2>
+        <p class="auth-copy">Update your authentication password.</p>
+
+        <form method="post" @onsubmit="HandlePasswordChange" class="auth-form">
+            <AntiforgeryToken />
+
+            <div class="form-group">
+                <label for="current-password">Current Password</label>
+                <InputText id="current-password" type="password" @bind-Value="CurrentPassword" autocomplete="current-password" required />
+            </div>
+
+            <div class="form-group">
+                <label for="new-password">New Password</label>
+                <InputText id="new-password" type="password" @bind-Value="NewPassword" autocomplete="new-password" required />
+            </div>
+
+            <div class="form-group">
+                <label for="confirm-password">Confirm New Password</label>
+                <InputText id="confirm-password" type="password" @bind-Value="ConfirmPassword" autocomplete="new-password" required />
+            </div>
+
+            <button type="submit" class="btn-primary">Update Password</button>
+        </form>
+    </div>
+</div>
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState> AuthState { get; set; } = default!;
+
+    [SupplyParameterFromQuery(Name = "success")] public string? SuccessValue { get; set; }
+    [SupplyParameterFromQuery(Name = "error")] public string? ErrorValue { get; set; }
+
+    private string CurrentPassword { get; set; } = string.Empty;
+    private string NewPassword { get; set; } = string.Empty;
+    private string ConfirmPassword { get; set; } = string.Empty;
+
+    private bool Success => string.Equals(SuccessValue, "true", StringComparison.OrdinalIgnoreCase);
+    private bool Error => !string.IsNullOrEmpty(ErrorValue);
+    private string ErrorMessage => ErrorValue ?? "An error occurred.";
+
+    private async Task HandlePasswordChange()
+    {
+        if (NewPassword != ConfirmPassword)
+        {
+            NavigationManager.NavigateTo("/settings?error=Passwords do not match");
+            return;
+        }
+
+        if (NewPassword.Length < 6)
+        {
+            NavigationManager.NavigateTo("/settings?error=Password must be at least 6 characters");
+            return;
+        }
+
+        var authState = await AuthState;
+        var username = authState.User.Identity?.Name ?? "admin";
+
+        if (!AuthService.ValidateCredentials(username, CurrentPassword))
+        {
+            NavigationManager.NavigateTo("/settings?error=Current password is incorrect");
+            return;
+        }
+
+        try
+        {
+            await AuthService.UpdatePasswordAsync(username, NewPassword);
+            NavigationManager.NavigateTo("/settings?success=true");
+        }
+        catch (Exception ex)
+        {
+            NavigationManager.NavigateTo($"/settings?error={Uri.EscapeDataString(ex.Message)}");
+        }
+    }
+}
