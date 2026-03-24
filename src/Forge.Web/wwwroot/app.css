@@ -653,6 +653,13 @@ a:hover {
     font-size: 0.8125rem;
     line-height: 1.5;
     white-space: pre;
+    color: #c9d1d9;
+}
+
+/* Diff syntax highlighting - override Prism for diff files */
+.diff-content {
+    -webkit-user-select: text;
+    user-select: text;
 }
 
 /* Branch List */
