@@ -654,12 +654,27 @@ a:hover {
     line-height: 1.5;
     white-space: pre;
     color: #c9d1d9;
-}
-
-/* Diff syntax highlighting - override Prism for diff files */
-.diff-content {
     -webkit-user-select: text;
     user-select: text;
+}
+
+/* Diff line coloring - escape HTML entities in razor, then style by prefix */
+.diff-line-add {
+    color: #3fb950;
+    background: rgba(46, 160, 67, 0.15);
+    display: block;
+}
+
+.diff-line-del {
+    color: #f85149;
+    background: rgba(248, 81, 73, 0.1);
+    display: block;
+}
+
+.diff-line-header {
+    color: #8b949e;
+    background: rgba(139, 148, 158, 0.1);
+    display: block;
 }
 
 /* Branch List */
