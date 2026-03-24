@@ -159,7 +159,7 @@ window.forge.webauthn = {
   },
   
   // Check if WebAuthn is available
-  isAvailable: async () => {
+  isAvailable: () => {
     // WebAuthn requires a secure context (HTTPS or localhost)
     const isSecure = window.location.protocol === 'https:' || 
                      window.location.hostname === 'localhost' || 
@@ -170,21 +170,13 @@ window.forge.webauthn = {
       return false;
     }
     
-    if (window.PublicKeyCredential === undefined) {
+    if (typeof window.PublicKeyCredential === 'undefined') {
       console.log('[WebAuthn] Not available: PublicKeyCredential not defined');
       return false;
     }
     
-    // Check if the browser actually supports creating credentials
-    try {
-      const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-      console.log('[WebAuthn] Platform authenticator available:', available);
-      return true;
-    } catch (e) {
-      console.log('[WebAuthn] Error checking authenticator:', e);
-      // Still return true if PublicKeyCredential exists - might work with cross-platform authenticators
-      return window.PublicKeyCredential !== undefined;
-    }
+    console.log('[WebAuthn] Available');
+    return true;
   },
   
   // Full sign-in flow
