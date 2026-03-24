@@ -1,5 +1,6 @@
-@page "/o/{Owner}"
+@page "/{Owner}"
 @inject IRepositoryService RepositoryService
+@using Microsoft.EntityFrameworkCore
 
 <PageTitle>@Owner - Forge</PageTitle>
 
@@ -7,37 +8,23 @@
     <h1>@Owner</h1>
 </div>
 
+<p>Owner parameter: @Owner</p>
+
 @if (repos == null)
 {
     <p>Loading...</p>
 }
 else if (!repos.Any())
 {
-    <p class="empty-state">No repositories</p>
+    <p class="empty-state">No repositories for @Owner</p>
 }
 else
 {
+    <p>Found @repos.Count() repos</p>
     @foreach (var repo in repos)
     {
         <div class="card" style="margin-bottom: 0.5rem; padding: 1rem;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div>
-                    <a href="/@repo.Owner/@repo.Name" style="font-weight: 600; font-size: 1.1rem;">
-                        @repo.Name
-                    </a>
-                    @if (repo.IsPrivate)
-                    {
-                        <span class="badge">Private</span>
-                    }
-                    @if (!string.IsNullOrEmpty(repo.Description))
-                    {
-                        <p style="margin: 0.25rem 0 0 0; color: #8b949e;">@repo.Description</p>
-                    }
-                </div>
-                <div style="color: #8b949e; font-size: 0.875rem;">
-                    Updated @repo.UpdatedAt.ToString("yyyy-MM-dd")
-                </div>
-            </div>
+            <a href="/@repo.Owner/@repo.Name">@repo.Name</a>
         </div>
     }
 }
@@ -47,8 +34,10 @@ else
 
     private IEnumerable<Repository>? repos;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
+        Console.WriteLine($"[OwnerPage] Owner={Owner}");
         repos = await RepositoryService.GetByOwnerAsync(Owner);
+        Console.WriteLine($"[OwnerPage] Found {repos?.Count() ?? 0} repos");
     }
-}// force rebuild
+}

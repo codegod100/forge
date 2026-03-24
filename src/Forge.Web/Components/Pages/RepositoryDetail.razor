@@ -1,4 +1,4 @@
-@page "/{Owner}/{Name:required}"
+@page "/{Owner}/{Name}"
 @inject IRepositoryService RepositoryService
 @inject IGitService GitService
 @inject NavigationManager Navigation
@@ -13,7 +13,7 @@ else
 {
     <div class="repo-header">
         <h1>
-            <a href="/o/@repo.Owner">@repo.Owner</a> / <strong>@repo.Name</strong>
+            <a href="/@repo.Owner">@repo.Owner</a> / <strong>@repo.Name</strong>
             @if (repo.IsPrivate)
             {
                 <span class="badge">Private</span>
