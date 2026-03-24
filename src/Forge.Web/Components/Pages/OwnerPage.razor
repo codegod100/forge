@@ -1,4 +1,4 @@
-@page "/{Owner}"
+@page "/o/{Owner}"
 @inject IRepositoryService RepositoryService
 
 <PageTitle>@Owner - Forge</PageTitle>
@@ -51,4 +51,4 @@ else
     {
         repos = await RepositoryService.GetByOwnerAsync(Owner);
     }
-}
+}// force rebuild
