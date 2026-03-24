@@ -67,7 +67,7 @@ public class GitService : IGitService
                         Name = b.FriendlyName,
                         HeadSha = b.Tip?.Sha ?? "",
                         IsDefault = b.FriendlyName == repository.DefaultBranch,
-                        LastCommitDate = b.Tip?.Author.When.DateTime,
+                        LastCommitDate = b.Tip?.Author.When.UtcDateTime,
                         LastCommitMessage = b.Tip?.MessageShort
                     });
                 }
@@ -105,7 +105,7 @@ public class GitService : IGitService
                 Name = branch.FriendlyName,
                 HeadSha = branch.Tip?.Sha ?? "",
                 IsDefault = branch.FriendlyName == repository.DefaultBranch,
-                LastCommitDate = branch.Tip?.Author.When.DateTime,
+                LastCommitDate = branch.Tip?.Author.When.UtcDateTime,
                 LastCommitMessage = branch.Tip?.MessageShort
             });
         }
@@ -237,10 +237,10 @@ public class GitService : IGitService
                     Message = c.Message,
                     Author = c.Author.Name,
                     AuthorEmail = c.Author.Email,
-                    AuthorDate = c.Author.When.DateTime,
+                    AuthorDate = c.Author.When.UtcDateTime,
                     Committer = c.Committer.Name,
                     CommitterEmail = c.Committer.Email,
-                    CommitterDate = c.Committer.When.DateTime,
+                    CommitterDate = c.Committer.When.UtcDateTime,
                     ParentSha = c.Parents.FirstOrDefault()?.Sha
                 })
                 .ToList();
@@ -333,10 +333,10 @@ public class GitService : IGitService
             Message = commit.Message,
             Author = commit.Author.Name,
             AuthorEmail = commit.Author.Email,
-            AuthorDate = commit.Author.When.DateTime,
+            AuthorDate = commit.Author.When.UtcDateTime,
             Committer = commit.Committer.Name,
             CommitterEmail = commit.Committer.Email,
-            CommitterDate = commit.Committer.When.DateTime,
+            CommitterDate = commit.Committer.When.UtcDateTime,
             ParentSha = commit.Parents.FirstOrDefault()?.Sha,
             Changes = changes
         });
