@@ -1,10 +1,12 @@
 @page "/{Owner}/{Name}"
 @page "/{Owner}/{Name}/settings"
-@attribute [Authorize]
-@using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components
+@using Microsoft.JSInterop
 @inject IRepositoryService RepositoryService
 @inject IGitService GitService
+@inject Forge.Web.Services.MarkdownService MarkdownService
+@inject IJSRuntime JS
 @inject NavigationManager Navigation
 @rendermode InteractiveServer
 
@@ -86,6 +88,18 @@ else
                     }
                 </tbody>
             </table>
+
+            @if (!string.IsNullOrEmpty(readmeHtml.Value))
+            {
+                <section class="readme-card">
+                    <div class="readme-header">
+                        <h3>@readmeName</h3>
+                    </div>
+                    <article class="markdown-body">
+                        @readmeHtml
+                    </article>
+                </section>
+            }
         }
     }
     else if (tab == "commits")
@@ -194,6 +208,8 @@ else
     private IEnumerable<BranchInfo>? branchList;
     private IEnumerable<TreeNode>? files;
     private IEnumerable<CommitInfo>? commitList;
+    private MarkupString readmeHtml;
+    private string? readmeName;
     private string? currentUser;
     private string? description;
     private bool isPrivate;
@@ -219,6 +235,15 @@ else
             commitList = await GitService.GetCommitsAsync(repo, repo.DefaultBranch);
             description = repo.Description;
             isPrivate = repo.IsPrivate;
+            await LoadReadmeAsync();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!string.IsNullOrEmpty(readmeHtml.Value))
+        {
+            await JS.InvokeVoidAsync("forge.highlightCodeBlocks");
         }
     }
 
@@ -254,6 +279,34 @@ else
 
         message = "Repository settings saved.";
         error = null;
+    }
+
+    private async Task LoadReadmeAsync()
+    {
+        readmeHtml = default;
+        readmeName = null;
+
+        var readmeEntry = files?.FirstOrDefault(f =>
+            f.Type == TreeEntryType.File &&
+            (
+                string.Equals(f.Name, "README.md", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(f.Name, "README.markdown", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(f.Name, "README", StringComparison.OrdinalIgnoreCase)
+            ));
+
+        if (repo == null || readmeEntry == null)
+        {
+            return;
+        }
+
+        var readmeFile = await GitService.GetFileAsync(repo, repo.DefaultBranch, readmeEntry.Path);
+        if (string.IsNullOrWhiteSpace(readmeFile?.Content))
+        {
+            return;
+        }
+
+        readmeName = readmeEntry.Name;
+        readmeHtml = MarkdownService.Render(readmeFile.Content);
     }
 
     private static string FormatSize(long bytes)

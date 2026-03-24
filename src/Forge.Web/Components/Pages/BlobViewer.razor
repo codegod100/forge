@@ -1,6 +1,9 @@
 @page "/{Owner}/{Name}/blob/{Branch}/{*Path}"
+@using Microsoft.JSInterop
 @inject IRepositoryService RepositoryService
 @inject IGitService GitService
+@inject IJSRuntime JS
+@rendermode InteractiveServer
 
 <PageTitle>@Path - @Owner/@Name - Forge</PageTitle>
 
@@ -43,7 +46,7 @@ else
     }
     else
     {
-        <pre class="file-content">@file.Content</pre>
+        <pre class="file-content"><code class="@LanguageClass">@file.Content</code></pre>
     }
 }
 
@@ -56,6 +59,7 @@ else
     private Repository? repo;
     private TreeNode? file;
     private string[] pathParts => Path?.Split('/', '\\') ?? [];
+    private string LanguageClass => $"language-{GetLanguage(Path)}";
 
     protected override async Task OnInitializedAsync()
     {
@@ -64,6 +68,30 @@ else
         {
             file = await GitService.GetFileAsync(repo, Branch, Path);
         }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (file?.Content != null)
+        {
+            await JS.InvokeVoidAsync("forge.highlightCodeBlocks");
+        }
+    }
+
+    private static string GetLanguage(string? path)
+    {
+        var extension = System.IO.Path.GetExtension(path)?.ToLowerInvariant();
+        return extension switch
+        {
+            ".cs" or ".csproj" => "csharp",
+            ".js" or ".mjs" or ".cjs" => "javascript",
+            ".json" => "json",
+            ".css" => "css",
+            ".html" or ".xml" or ".razor" or ".svg" => "markup",
+            ".sh" or ".bash" => "bash",
+            ".md" => "markdown",
+            _ => "clike"
+        };
     }
 
     private static string FormatSize(long bytes)

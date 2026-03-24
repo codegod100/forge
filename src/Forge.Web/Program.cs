@@ -1,6 +1,7 @@
 using Forge.Web.Components;
 using Forge.Web.GitHttp;
 using Forge.Web.Auth;
+using Forge.Web.Services;
 using Forge.Data;
 using Forge.Data.Services;
 using Forge.Core.Services;
@@ -20,6 +21,7 @@ builder.Services.AddHttpContextAccessor();
 
 builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection(AuthOptions.SectionName));
 builder.Services.AddSingleton<IAuthService, ConfiguredAuthService>();
+builder.Services.AddSingleton<MarkdownService>();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
