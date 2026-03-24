@@ -76,6 +76,26 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ForgeDbContext>();
     db.Database.EnsureCreated();
+    
+    // Ensure PasskeyCredentials table exists (for existing databases)
+    var connection = db.Database.GetDbConnection();
+    await connection.OpenAsync();
+    using var cmd = connection.CreateCommand();
+    cmd.CommandText = """
+        CREATE TABLE IF NOT EXISTS PasskeyCredentials (
+            Id TEXT PRIMARY KEY,
+            Username TEXT NOT NULL,
+            CredentialId BLOB NOT NULL UNIQUE,
+            PublicKey BLOB NOT NULL,
+            SignCount INTEGER NOT NULL,
+            Name TEXT,
+            CreatedAt TEXT NOT NULL,
+            LastUsedAt TEXT
+        );
+        CREATE INDEX IF NOT EXISTS IX_PasskeyCredentials_Username ON PasskeyCredentials (Username);
+        CREATE INDEX IF NOT EXISTS IX_PasskeyCredentials_CredentialId ON PasskeyCredentials (CredentialId);
+        """;
+    await cmd.ExecuteNonQueryAsync();
 
     // Validate all repos in DB exist on disk, repair any missing
     var gitService = scope.ServiceProvider.GetRequiredService<IGitService>();
