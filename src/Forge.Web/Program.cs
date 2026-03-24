@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using Fido2NetLib;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -45,6 +46,18 @@ Directory.CreateDirectory(reposRoot);
 // Register services
 builder.Services.AddSingleton<IGitService>(sp => new GitService(reposRoot));
 builder.Services.AddScoped<IRepositoryService, RepositoryService>();
+
+// Configure Fido2
+var baseUrl = builder.Configuration["BaseUrl"] ?? "http://localhost:5128";
+var fido2Config = new Fido2Configuration
+{
+    ServerDomain = new Uri(baseUrl).Host,
+    ServerName = "Forge",
+    Origins = new HashSet<string> { baseUrl.TrimEnd('/') },
+    TimestampDriftTolerance = 300000
+};
+builder.Services.AddSingleton<IFido2>(sp => new Fido2NetLib.Fido2(fido2Config));
+builder.Services.AddScoped<IFido2Service, Fido2Service>();
 
 // Git HTTP middleware
 builder.Services.AddScoped<GitHttpMiddleware>(sp => 
@@ -129,6 +142,152 @@ app.MapPost("/auth/logout", async (HttpContext context) =>
     return Results.LocalRedirect("/");
 });
 
+// WebAuthn / Passkey endpoints
+app.MapPost("/auth/passkey/register/start", async (
+    HttpContext context,
+    [FromServices] IFido2Service fido2Service,
+    [FromServices] IAuthService authService) =>
+{
+    var username = authService.GetConfiguredUsername();
+    if (string.IsNullOrEmpty(username))
+    {
+        return Results.BadRequest(new { error = "No user configured" });
+    }
+    
+    var options = await fido2Service.StartRegistrationAsync(username);
+    
+    // Return options as JSON (Fido2NetLib handles serialization)
+    return Results.Json(options);
+});
+
+app.MapPost("/auth/passkey/register/complete", async (
+    HttpContext context,
+    [FromServices] IFido2Service fido2Service,
+    [FromServices] IAuthService authService,
+    [FromBody] PasskeyRegistrationRequest request) =>
+{
+    var username = authService.GetConfiguredUsername();
+    if (string.IsNullOrEmpty(username))
+    {
+        return Results.BadRequest(new { error = "No user configured" });
+    }
+    
+    try
+    {
+        var response = new Fido2NetLib.AuthenticatorAttestationRawResponse
+        {
+            Id = request.Id,
+            RawId = request.RawId,
+            Type = Fido2NetLib.Objects.PublicKeyCredentialType.PublicKey,
+            Response = new Fido2NetLib.AuthenticatorAttestationRawResponse.AttestationResponse
+            {
+                ClientDataJson = request.Response.ClientDataJSON,
+                AttestationObject = request.Response.AttestationObject,
+                Transports = []
+            },
+            ClientExtensionResults = request.ClientExtensionResults ?? new Fido2NetLib.Objects.AuthenticationExtensionsClientOutputs()
+        };
+        
+        var credential = await fido2Service.CompleteRegistrationAsync(username, response, request.DeviceName);
+        return Results.Json(new { success = true, credentialId = credential.Id });
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapGet("/auth/passkey/authenticate/start", async (
+    [FromServices] IFido2Service fido2Service) =>
+{
+    var options = await fido2Service.StartAuthenticationAsync();
+    return Results.Json(options);
+});
+
+app.MapPost("/auth/passkey/authenticate/complete", async (
+    HttpContext context,
+    [FromServices] IFido2Service fido2Service,
+    [FromServices] IAuthService authService,
+    [FromBody] PasskeyAuthenticationRequest request) =>
+{
+    try
+    {
+        var response = new Fido2NetLib.AuthenticatorAssertionRawResponse
+        {
+            Id = request.Id,
+            RawId = request.RawId,
+            Type = Fido2NetLib.Objects.PublicKeyCredentialType.PublicKey,
+            Response = new Fido2NetLib.AuthenticatorAssertionRawResponse.AssertionResponse
+            {
+                ClientDataJson = request.Response.ClientDataJSON,
+                AuthenticatorData = request.Response.AuthenticatorData,
+                Signature = request.Response.Signature,
+                UserHandle = request.Response.UserHandle
+            },
+            ClientExtensionResults = request.ClientExtensionResults ?? new Fido2NetLib.Objects.AuthenticationExtensionsClientOutputs()
+        };
+        
+        var username = await fido2Service.CompleteAuthenticationAsync(response);
+        
+        if (username == null)
+        {
+            return Results.Json(new { success = false, error = "Authentication failed" });
+        }
+        
+        // Sign the user in
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.Name, username),
+            new(ClaimTypes.Role, "Admin")
+        };
+        
+        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+        var principal = new ClaimsPrincipal(identity);
+        
+        await context.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
+        
+        return Results.Json(new { success = true });
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapGet("/auth/passkey/credentials", async (
+    [FromServices] IFido2Service fido2Service,
+    [FromServices] IAuthService authService) =>
+{
+    var username = authService.GetConfiguredUsername();
+    if (string.IsNullOrEmpty(username))
+    {
+        return Results.BadRequest(new { error = "No user configured" });
+    }
+    
+    var credentials = await fido2Service.GetCredentialsAsync(username);
+    return Results.Json(credentials.Select(c => new {
+        c.Id,
+        c.Name,
+        c.CreatedAt,
+        c.LastUsedAt
+    }));
+});
+
+app.MapDelete("/auth/passkey/credentials/{id}", async (
+    Guid id,
+    [FromServices] IFido2Service fido2Service,
+    [FromServices] IAuthService authService) =>
+{
+    var username = authService.GetConfiguredUsername();
+    if (string.IsNullOrEmpty(username))
+    {
+        return Results.BadRequest(new { error = "No user configured" });
+    }
+    
+    await fido2Service.DeleteCredentialAsync(id, username);
+    return Results.Json(new { success = true });
+});
+
 // Git Smart HTTP endpoints
 app.MapMethods("/{owner}/{repo}.git/{**rest}", new[] { "GET", "POST" }, async (HttpContext context, string owner, string repo,
     [FromServices] GitHttpMiddleware git) =>
@@ -137,3 +296,29 @@ app.MapMethods("/{owner}/{repo}.git/{**rest}", new[] { "GET", "POST" }, async (H
 });
 
 app.Run();
+
+// DTOs for passkey requests
+public record PasskeyRegistrationRequest(
+    string Id,
+    byte[] RawId,
+    string Type,
+    PasskeyRegistrationResponse Response,
+    string? DeviceName,
+    Fido2NetLib.Objects.AuthenticationExtensionsClientOutputs? ClientExtensionResults);
+
+public record PasskeyRegistrationResponse(
+    byte[] ClientDataJSON,
+    byte[] AttestationObject);
+
+public record PasskeyAuthenticationRequest(
+    string Id,
+    byte[] RawId,
+    string Type,
+    PasskeyAuthenticationResponse Response,
+    Fido2NetLib.Objects.AuthenticationExtensionsClientOutputs? ClientExtensionResults);
+
+public record PasskeyAuthenticationResponse(
+    byte[] ClientDataJSON,
+    byte[] AuthenticatorData,
+    byte[] Signature,
+    byte[]? UserHandle);

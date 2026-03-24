@@ -1,10 +1,13 @@
 @page "/settings"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @using Forge.Web.Auth
+@using Forge.Data.Services
 @using Microsoft.AspNetCore.Components.Authorization
 @inject IAuthService AuthService
+@inject IFido2Service Fido2Service
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime JS
 
 <PageTitle>Settings - Forge</PageTitle>
 
@@ -30,21 +33,80 @@
 
             <div class="form-group">
                 <label for="current-password">Current Password</label>
-                <InputText id="current-password" type="password" @bind-Value="CurrentPassword" autocomplete="current-password" required />
+                <input id="current-password" type="password" @bind="CurrentPassword" autocomplete="current-password" required />
             </div>
 
             <div class="form-group">
                 <label for="new-password">New Password</label>
-                <InputText id="new-password" type="password" @bind-Value="NewPassword" autocomplete="new-password" required />
+                <input id="new-password" type="password" @bind="NewPassword" autocomplete="new-password" required />
             </div>
 
             <div class="form-group">
                 <label for="confirm-password">Confirm New Password</label>
-                <InputText id="confirm-password" type="password" @bind-Value="ConfirmPassword" autocomplete="new-password" required />
+                <input id="confirm-password" type="password" @bind="ConfirmPassword" autocomplete="new-password" required />
             </div>
 
             <button type="submit" class="btn-primary">Update Password</button>
         </form>
+    </div>
+
+    <div class="settings-card">
+        <h2>Passkeys</h2>
+        <p class="auth-copy">Register passkeys for passwordless authentication. Passkeys are stored on your device and synced across your devices via iCloud Keychain, Google Password Manager, or other password managers.</p>
+        
+        @if (!webauthnAvailable)
+        {
+            <p class="auth-warning">WebAuthn is not available in this browser. Passkeys require a modern browser with WebAuthn support.</p>
+        }
+        else
+        {
+            @if (passkeys.Any())
+            {
+                <div class="passkey-list">
+                    @foreach (var passkey in passkeys)
+                    {
+                        <div class="passkey-item">
+                            <div class="passkey-info">
+                                <span class="passkey-name">@(passkey.Name ?? "Unnamed passkey")</span>
+                                <span class="passkey-date">Created @passkey.CreatedAt.ToString("MMM d, yyyy")</span>
+                                @if (passkey.LastUsedAt.HasValue)
+                                {
+                                    <span class="passkey-date">Last used @passkey.LastUsedAt.Value.ToString("MMM d, yyyy")</span>
+                                }
+                            </div>
+                            <button type="button" class="btn-danger-small" @onclick="() => DeletePasskey(passkey.Id)">Delete</button>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <p class="auth-copy">No passkeys registered yet.</p>
+            }
+
+            @if (showRegisterForm)
+            {
+                <div class="passkey-register-form">
+                    <div class="form-group">
+                        <label for="device-name">Device Name (optional)</label>
+                        <input id="device-name" type="text" @bind="deviceName" placeholder="e.g., iPhone 15 Pro, MacBook Pro" />
+                    </div>
+                    <div class="button-row">
+                        <button type="button" class="btn-primary" @onclick="RegisterPasskey">Register Passkey</button>
+                        <button type="button" class="btn-secondary" @onclick="() => showRegisterForm = false">Cancel</button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <button type="button" class="btn-primary" @onclick="() => showRegisterForm = true">Add Passkey</button>
+            }
+            
+            @if (passkeyError != null)
+            {
+                <p class="auth-error">@passkeyError</p>
+            }
+        }
     </div>
 </div>
 
@@ -61,6 +123,32 @@
     private bool Success => string.Equals(SuccessValue, "true", StringComparison.OrdinalIgnoreCase);
     private bool Error => !string.IsNullOrEmpty(ErrorValue);
     private string ErrorMessage => ErrorValue ?? "An error occurred.";
+
+    private bool webauthnAvailable = false;
+    private bool showRegisterForm = false;
+    private string deviceName = string.Empty;
+    private string? passkeyError;
+    private List<Forge.Core.Models.PasskeyCredential> passkeys = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthState;
+        var username = authState.User.Identity?.Name;
+        
+        if (!string.IsNullOrEmpty(username))
+        {
+            passkeys = (await Fido2Service.GetCredentialsAsync(username)).ToList();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            webauthnAvailable = await JS.InvokeAsync<bool>("forge.webauthn.isAvailable");
+            StateHasChanged();
+        }
+    }
 
     private async Task HandlePasswordChange()
     {
@@ -93,6 +181,51 @@
         catch (Exception ex)
         {
             NavigationManager.NavigateTo($"/settings?error={Uri.EscapeDataString(ex.Message)}");
+        }
+    }
+
+    private async Task RegisterPasskey()
+    {
+        passkeyError = null;
+        
+        try
+        {
+            var result = await JS.InvokeAsync<Dictionary<string, object>>("forge.webauthn.registerDevice", deviceName);
+            
+            if (result.TryGetValue("success", out var success) && (bool)success)
+            {
+                // Refresh passkeys list
+                var authState = await AuthState;
+                var username = authState.User.Identity?.Name;
+                if (!string.IsNullOrEmpty(username))
+                {
+                    passkeys = (await Fido2Service.GetCredentialsAsync(username)).ToList();
+                }
+                showRegisterForm = false;
+                deviceName = string.Empty;
+                StateHasChanged();
+            }
+            else if (result.TryGetValue("error", out var error))
+            {
+                passkeyError = error?.ToString();
+            }
+        }
+        catch (Exception ex)
+        {
+            passkeyError = $"Registration failed: {ex.Message}";
+        }
+    }
+
+    private async Task DeletePasskey(Guid credentialId)
+    {
+        var authState = await AuthState;
+        var username = authState.User.Identity?.Name;
+        
+        if (!string.IsNullOrEmpty(username))
+        {
+            await Fido2Service.DeleteCredentialAsync(credentialId, username);
+            passkeys = passkeys.Where(p => p.Id != credentialId).ToList();
+            StateHasChanged();
         }
     }
 }

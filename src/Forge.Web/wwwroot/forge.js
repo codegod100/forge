@@ -44,3 +44,175 @@ window.forge.initFileSearch = (dotNetHelper) => {
   window.forge._fileSearchHandler = handleKeydown;
   window.forge._dotNetHelper = dotNetHelper;
 };
+
+// WebAuthn / Passkey functions
+window.forge.webauthn = {
+  // Convert ArrayBuffer to Base64URL string
+  arrayBufferToBase64Url: (buffer) => {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    bytes.forEach(b => binary += String.fromCharCode(b));
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  },
+  
+  // Convert Base64URL string to ArrayBuffer
+  base64UrlToArrayBuffer: (base64Url) => {
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
+  },
+  
+  // Convert object with base64url fields to ArrayBuffer fields recursively
+  decodeOptions: (options) => {
+    const decoded = { ...options };
+    
+    if (options.challenge) {
+      decoded.challenge = window.forge.webauthn.base64UrlToArrayBuffer(options.challenge);
+    }
+    
+    if (options.user?.id) {
+      decoded.user = { ...options.user };
+      decoded.user.id = window.forge.webauthn.base64UrlToArrayBuffer(options.user.id);
+    }
+    
+    if (options.allowCredentials) {
+      decoded.allowCredentials = options.allowCredentials.map(c => ({
+        ...c,
+        id: window.forge.webauthn.base64UrlToArrayBuffer(c.id)
+      }));
+    }
+    
+    if (options.excludeCredentials) {
+      decoded.excludeCredentials = options.excludeCredentials.map(c => ({
+        ...c,
+        id: window.forge.webauthn.base64UrlToArrayBuffer(c.id)
+      }));
+    }
+    
+    return decoded;
+  },
+  
+  // Encode credential response for transmission
+  encodeCredential: (credential) => {
+    return {
+      id: credential.id,
+      rawId: window.forge.webauthn.arrayBufferToBase64Url(credential.rawId),
+      type: credential.type,
+      response: {
+        clientDataJSON: window.forge.webauthn.arrayBufferToBase64Url(credential.response.clientDataJSON),
+        attestationObject: window.forge.webauthn.arrayBufferToBase64Url(credential.response.attestationObject)
+      },
+      clientExtensionResults: credential.getClientExtensionResults()
+    };
+  },
+  
+  // Encode assertion response for transmission
+  encodeAssertion: (assertion) => {
+    return {
+      id: assertion.id,
+      rawId: window.forge.webauthn.arrayBufferToBase64Url(assertion.rawId),
+      type: assertion.type,
+      response: {
+        clientDataJSON: window.forge.webauthn.arrayBufferToBase64Url(assertion.response.clientDataJSON),
+        authenticatorData: window.forge.webauthn.arrayBufferToBase64Url(assertion.response.authenticatorData),
+        signature: window.forge.webauthn.arrayBufferToBase64Url(assertion.response.signature),
+        userHandle: assertion.response.userHandle 
+          ? window.forge.webauthn.arrayBufferToBase64Url(assertion.response.userHandle)
+          : null
+      },
+      clientExtensionResults: assertion.getClientExtensionResults()
+    };
+  },
+  
+  // Start passkey registration
+  register: async (optionsJson) => {
+    try {
+      const options = window.forge.webauthn.decodeOptions(JSON.parse(optionsJson));
+      const credential = await navigator.credentials.create({ publicKey: options });
+      return JSON.stringify(window.forge.webauthn.encodeCredential(credential));
+    } catch (error) {
+      console.error('WebAuthn registration error:', error);
+      throw error;
+    }
+  },
+  
+  // Start passkey authentication
+  authenticate: async (optionsJson) => {
+    try {
+      const options = window.forge.webauthn.decodeOptions(JSON.parse(optionsJson));
+      const assertion = await navigator.credentials.get({ publicKey: options });
+      return JSON.stringify(window.forge.webauthn.encodeAssertion(assertion));
+    } catch (error) {
+      console.error('WebAuthn authentication error:', error);
+      throw error;
+    }
+  },
+  
+  // Check if WebAuthn is available
+  isAvailable: () => {
+    return window.PublicKeyCredential !== undefined;
+  },
+  
+  // Full sign-in flow
+  signIn: async (redirectUrl) => {
+    try {
+      // Get authentication options
+      const optionsResp = await fetch('/auth/passkey/authenticate/start');
+      const optionsJson = await optionsResp.text();
+      
+      // Call WebAuthn API
+      const assertionJson = await window.forge.webauthn.authenticate(optionsJson);
+      
+      // Send assertion to server
+      const completeResp = await fetch('/auth/passkey/authenticate/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: assertionJson,
+        credentials: 'include'
+      });
+      
+      const result = await completeResp.json();
+      
+      if (result.success) {
+        return redirectUrl;
+      } else {
+        return 'error';
+      }
+    } catch (error) {
+      console.error('Passkey sign-in error:', error);
+      return 'error';
+    }
+  },
+  
+  // Full registration flow
+  registerDevice: async (deviceName) => {
+    try {
+      // Get registration options
+      const optionsResp = await fetch('/auth/passkey/register/start');
+      const optionsJson = await optionsResp.text();
+      
+      // Call WebAuthn API
+      const credentialJson = await window.forge.webauthn.register(optionsJson);
+      
+      // Send credential to server
+      const completeResp = await fetch('/auth/passkey/register/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...JSON.parse(credentialJson),
+          deviceName: deviceName || null
+        })
+      });
+      
+      const result = await completeResp.json();
+      return result;
+    } catch (error) {
+      console.error('Passkey registration error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+};

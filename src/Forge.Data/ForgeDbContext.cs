@@ -6,6 +6,7 @@ namespace Forge.Data;
 public class ForgeDbContext : DbContext
 {
     public DbSet<Repository> Repositories => Set<Repository>();
+    public DbSet<PasskeyCredential> PasskeyCredentials => Set<PasskeyCredential>();
     
     public ForgeDbContext(DbContextOptions<ForgeDbContext> options) : base(options)
     {
@@ -22,6 +23,16 @@ public class ForgeDbContext : DbContext
             entity.Property(r => r.Description).HasMaxLength(500);
             entity.Property(r => r.Path).IsRequired().HasMaxLength(500);
             entity.Property(r => r.DefaultBranch).IsRequired().HasMaxLength(100);
+        });
+        
+        modelBuilder.Entity<PasskeyCredential>(entity =>
+        {
+            entity.HasKey(c => c.Id);
+            entity.HasIndex(c => c.CredentialId).IsUnique();
+            entity.HasIndex(c => c.Username);
+            entity.Property(c => c.Username).IsRequired().HasMaxLength(100);
+            entity.Property(c => c.Name).HasMaxLength(100);
+            entity.Ignore(c => c.AaGuid); // Don't persist AaGuid, it's only needed during registration
         });
     }
 }

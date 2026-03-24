@@ -1153,3 +1153,146 @@ mark {
         transform: rotate(360deg);
     }
 }
+
+/* Passkey styles */
+.auth-divider {
+    display: flex;
+    align-items: center;
+    margin: 1.5rem 0;
+    color: #484f58;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #30363d;
+}
+
+.auth-divider span {
+    padding: 0 1rem;
+    font-size: 0.875rem;
+}
+
+.btn-passkey {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    color: #c9d1d9;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.btn-passkey:hover:not(:disabled) {
+    background: #30363d;
+    border-color: #8b949e;
+}
+
+.btn-passkey:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.settings-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.settings-card h2 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.125rem;
+    color: #f0f6fc;
+}
+
+.passkey-list {
+    margin: 1rem 0;
+}
+
+.passkey-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem;
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+}
+
+.passkey-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.passkey-name {
+    font-weight: 500;
+    color: #f0f6fc;
+}
+
+.passkey-date {
+    font-size: 0.75rem;
+    color: #8b949e;
+}
+
+.btn-danger-small {
+    padding: 0.25rem 0.75rem;
+    background: transparent;
+    border: 1px solid #f85149;
+    border-radius: 6px;
+    color: #f85149;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.btn-danger-small:hover {
+    background: rgba(248, 81, 73, 0.15);
+}
+
+.btn-secondary {
+    padding: 0.5rem 1rem;
+    background: transparent;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    color: #c9d1d9;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.btn-secondary:hover {
+    background: #21262d;
+}
+
+.button-row {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+.passkey-register-form {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #30363d;
+}
+
+.auth-warning {
+    padding: 0.75rem;
+    background: rgba(210, 153, 34, 0.15);
+    border: 1px solid #d29922;
+    border-radius: 6px;
+    color: #d29922;
+    font-size: 0.875rem;
+}
