@@ -2,7 +2,6 @@
 @inject IRepositoryService RepositoryService
 @inject IGitService GitService
 @inject NavigationManager Navigation
-@using Microsoft.AspNetCore.WebUtilities
 
 <PageTitle>@(repo?.Owner)/@(repo?.Name) - Forge</PageTitle>
 
@@ -124,23 +123,16 @@ else
 @code {
     [Parameter] public string Owner { get; set; } = "";
     [Parameter] public string Name { get; set; } = "";
+    [SupplyParameterFromQuery] public string? Tab { get; set; }
 
     private Repository? repo;
     private IEnumerable<BranchInfo>? branchList;
     private IEnumerable<TreeNode>? files;
     private IEnumerable<CommitInfo>? commitList;
-    private string tab = "files";
+    private string tab => Tab ?? "files";
 
     protected override async Task OnInitializedAsync()
     {
-        // Parse query string for tab
-        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
-        QueryHelpers.ParseQuery(uri.Query).TryGetValue("tab", out var tabParam);
-        if (!string.IsNullOrEmpty(tabParam))
-        {
-            tab = tabParam.ToString();
-        }
-
         repo = await RepositoryService.GetByOwnerAndNameAsync(Owner, Name);
         if (repo != null)
         {
