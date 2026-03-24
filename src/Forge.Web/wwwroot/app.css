@@ -842,11 +842,21 @@ input[type="text"]:focus, textarea:focus {
     font-size: 0.875rem;
     color: #8b949e;
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .clone-copy:hover {
     background: #21262d;
     color: #f0f6fc;
+}
+
+.copy-feedback {
+    color: #3fb950;
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 0.25rem 0.5rem;
 }
 
 /* Last Commit (above file list) */
