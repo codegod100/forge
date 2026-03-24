@@ -51,4 +51,14 @@ public interface IGitService
     /// Check if a repository exists on disk
     /// </summary>
     bool RepositoryExists(Repository repository);
+
+    /// <summary>
+    /// Ensure a repository exists on disk, creating it if missing
+    /// </summary>
+    void EnsureRepositoryExists(Repository repository);
+
+    /// <summary>
+    /// Validate all repositories in database exist on disk, repair any missing
+    /// </summary>
+    Task<int> ValidateAndRepairRepositoriesAsync(IEnumerable<Repository> repositories);
 }

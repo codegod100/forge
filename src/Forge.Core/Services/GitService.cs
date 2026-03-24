@@ -289,6 +289,33 @@ public class GitService : IGitService
         return Directory.Exists(fullPath);
     }
 
+    public void EnsureRepositoryExists(Models.Repository repository)
+    {
+        var fullPath = GetFullPath(repository);
+        if (Directory.Exists(fullPath))
+            return;
+
+        // Recreate the bare repository
+        Directory.CreateDirectory(System.IO.Path.GetDirectoryName(fullPath)!);
+        LibGit2SharpRepository.Init(fullPath, true);
+        File.WriteAllText(System.IO.Path.Combine(fullPath, "HEAD"), "ref: refs/heads/main\n");
+        Console.WriteLine($"[Forge] Recreated missing repository: {repository.Owner}/{repository.Name}");
+    }
+
+    public Task<int> ValidateAndRepairRepositoriesAsync(IEnumerable<Models.Repository> repositories)
+    {
+        int repaired = 0;
+        foreach (var repo in repositories)
+        {
+            if (!RepositoryExists(repo))
+            {
+                EnsureRepositoryExists(repo);
+                repaired++;
+            }
+        }
+        return Task.FromResult(repaired);
+    }
+
     private string GetFullPath(Models.Repository repository)
     {
         return System.IO.Path.Combine(_repositoriesRoot, repository.Path);

@@ -37,26 +37,21 @@ builder.Services.AddScoped<GitHttpMiddleware>(sp =>
 
 var app = builder.Build();
 
-// Global error handling for development
-app.Use(async (context, next) =>
-{
-    try
-    {
-        await next();
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"[ERROR] {ex.Message}");
-        Console.WriteLine($"[ERROR] {ex.StackTrace}");
-        throw;
-    }
-});
-
-// Ensure database is created
+// Ensure database is created and validate repositories
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ForgeDbContext>();
     db.Database.EnsureCreated();
+
+    // Validate all repos in DB exist on disk, repair any missing
+    var gitService = scope.ServiceProvider.GetRequiredService<IGitService>();
+    var repoService = scope.ServiceProvider.GetRequiredService<IRepositoryService>();
+    var repos = await repoService.GetAllAsync();
+    var repaired = await gitService.ValidateAndRepairRepositoriesAsync(repos);
+    if (repaired > 0)
+    {
+        Console.WriteLine($"[Forge] Repaired {repaired} missing repositories");
+    }
 }
 
 // Configure the HTTP request pipeline.
