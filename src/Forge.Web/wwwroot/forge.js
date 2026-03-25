@@ -1,3 +1,4 @@
+console.log('[Forge] forge.js loaded');
 window.forge = window.forge || {};
 
 window.forge.highlightCodeBlocks = () => {
@@ -264,3 +265,5 @@ window.forge.webauthn = {
     }
   }
 };
+
+console.log('[Forge] webauthn module initialized, isAvailable:', typeof window.forge.webauthn.isAvailable);
