@@ -100,6 +100,12 @@ using (var scope = app.Services.CreateScope())
     // Validate all repos in DB exist on disk, repair any missing
     var gitService = scope.ServiceProvider.GetRequiredService<IGitService>();
     var repoService = scope.ServiceProvider.GetRequiredService<IRepositoryService>();
+    var imported = await repoService.SyncFromDiskAsync(reposRoot);
+    if (imported > 0)
+    {
+        Console.WriteLine($"[Forge] Imported {imported} repositories from disk");
+    }
+
     var repos = await repoService.GetAllAsync();
     var repaired = await gitService.ValidateAndRepairRepositoriesAsync(repos);
     if (repaired > 0)

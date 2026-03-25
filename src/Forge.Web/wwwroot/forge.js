@@ -58,7 +58,10 @@ window.forge.webauthn = {
   
   // Convert Base64URL string to ArrayBuffer
   base64UrlToArrayBuffer: (base64Url) => {
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const base64 = base64Url
+      .replace(/-/g, '+')
+      .replace(/_/g, '/')
+      .padEnd(base64Url.length + ((4 - (base64Url.length % 4)) % 4), '=');
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) {
@@ -221,8 +224,25 @@ window.forge.webauthn = {
         body: assertionJson,
         credentials: 'include'
       });
-      
-      const result = await completeResp.json();
+
+      const responseText = await completeResp.text();
+      let result;
+
+      try {
+        result = JSON.parse(responseText);
+      } catch {
+        console.error('[WebAuthn] Non-JSON authenticate/complete response:', responseText);
+        return JSON.stringify({
+          error: completeResp.ok
+            ? 'Authentication failed with an invalid server response'
+            : `Authentication failed (${completeResp.status})`
+        });
+      }
+
+      if (!completeResp.ok) {
+        return JSON.stringify({ error: result.error || `Authentication failed (${completeResp.status})` });
+      }
+
       console.log('[WebAuthn] Complete result:', result);
       
       if (result.success) {
@@ -241,7 +261,14 @@ window.forge.webauthn = {
   registerDevice: async (deviceName) => {
     try {
       // Get registration options
-      const optionsResp = await fetch('/auth/passkey/register/start');
+      const optionsResp = await fetch('/auth/passkey/register/start', {
+        method: 'POST'
+      });
+
+      if (!optionsResp.ok) {
+        return { success: false, error: `Registration options request failed (${optionsResp.status})` };
+      }
+
       const optionsJson = await optionsResp.text();
       
       // Call WebAuthn API
@@ -256,8 +283,21 @@ window.forge.webauthn = {
           deviceName: deviceName || null
         })
       });
-      
-      const result = await completeResp.json();
+
+      const responseText = await completeResp.text();
+      let result;
+
+      try {
+        result = JSON.parse(responseText);
+      } catch {
+        console.error('[WebAuthn] Non-JSON register/complete response:', responseText);
+        return { success: false, error: 'Registration failed with an invalid server response' };
+      }
+
+      if (!completeResp.ok) {
+        return { success: false, error: result.error || `Registration failed (${completeResp.status})` };
+      }
+
       return result;
     } catch (error) {
       console.error('Passkey registration error:', error);

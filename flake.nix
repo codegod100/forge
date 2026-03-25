@@ -11,7 +11,7 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
         dotnet-sdk = pkgs.dotnetCorePackages.dotnet_9.sdk;
-        dotnet-runtime = pkgs.dotnetCorePackages.dotnet_9.runtime;
+        dotnet-runtime = pkgs.dotnetCorePackages.dotnet_9.aspnetcore;
         flyctl = pkgs.flyctl;
 
         forge = pkgs.buildDotnetModule rec {
@@ -20,7 +20,7 @@
           projectFile = "src/Forge.Web/Forge.Web.csproj";
           nugetDeps = ./deps.json;
           dotnet-sdk = pkgs.dotnetCorePackages.dotnet_9.sdk;
-          dotnet-runtime = pkgs.dotnetCorePackages.dotnet_9.runtime;
+          dotnet-runtime = pkgs.dotnetCorePackages.dotnet_9.aspnetcore;
           executables = [ "Forge.Web" ];
           
           # Only build for linux-x64
@@ -39,7 +39,15 @@
               exit 1
             fi
             export Auth__PasswordFile="$password_file"
+            export WEBROOT="${forge}/lib/wwwroot"
+            
+            data_dir="''${FORGE_DATA_DIR:-''${XDG_DATA_HOME:-$HOME/.local/share}/forge}"
+            export Database__Path="$data_dir/forge.db"
+            export Repositories__Root="$data_dir/repositories"
+            
+            mkdir -p "$Repositories__Root"
             echo "Forge starting at: http://localhost:5128"
+            echo "Data directory: $data_dir"
             exec ${forge}/bin/Forge.Web --urls "http://localhost:5128" "$@"
           '';
         };

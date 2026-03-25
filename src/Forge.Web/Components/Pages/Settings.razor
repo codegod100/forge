@@ -4,6 +4,7 @@
 @using Forge.Web.Auth
 @using Forge.Data.Services
 @using Microsoft.AspNetCore.Components.Authorization
+@using System.Text.Json
 @inject IAuthService AuthService
 @inject IFido2Service Fido2Service
 @inject NavigationManager NavigationManager
@@ -202,7 +203,7 @@
         {
             var result = await JS.InvokeAsync<Dictionary<string, object>>("forge.webauthn.registerDevice", deviceName);
             
-            if (result.TryGetValue("success", out var success) && (bool)success)
+            if (result.TryGetValue("success", out var success) && IsTrue(success))
             {
                 // Refresh passkeys list
                 var authState = await AuthState;
@@ -225,6 +226,17 @@
             passkeyError = $"Registration failed: {ex.Message}";
         }
     }
+
+    private static bool IsTrue(object? value) =>
+        value switch
+        {
+            bool b => b,
+            JsonElement { ValueKind: JsonValueKind.True } => true,
+            JsonElement { ValueKind: JsonValueKind.False } => false,
+            JsonElement { ValueKind: JsonValueKind.String } json when bool.TryParse(json.GetString(), out var parsed) => parsed,
+            string s when bool.TryParse(s, out var parsed) => parsed,
+            _ => false
+        };
 
     private async Task DeletePasskey(Guid credentialId)
     {

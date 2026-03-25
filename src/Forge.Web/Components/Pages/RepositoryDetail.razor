@@ -1,5 +1,4 @@
 @page "/{Owner}/{Name}"
-@page "/{Owner}/{Name}/settings"
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Components.Web
@@ -34,12 +33,12 @@ else
     </div>
 
     <div class="tabs">
-        <a href="/@Owner/@Name?tab=files" class="tab @(tab == "files" ? "active" : "")">Files</a>
-        <a href="/@Owner/@Name?tab=commits" class="tab @(tab == "commits" ? "active" : "")">Commits</a>
-        <a href="/@Owner/@Name?tab=branches" class="tab @(tab == "branches" ? "active" : "")">Branches</a>
+        <button type="button" class="tab @(tab == "files" ? "active" : "")" @onclick='() => NavigateToTab("files")'>Files</button>
+        <button type="button" class="tab @(tab == "commits" ? "active" : "")" @onclick='() => NavigateToTab("commits")'>Commits</button>
+        <button type="button" class="tab @(tab == "branches" ? "active" : "")" @onclick='() => NavigateToTab("branches")'>Branches</button>
         @if (IsOwner)
         {
-            <a href="/@Owner/@Name/settings" class="tab @(tab == "settings" ? "active" : "")">Settings</a>
+            <button type="button" class="tab @(tab == "settings" ? "active" : "")" @onclick="NavigateToSettings">Settings</button>
         }
     </div>
 
@@ -280,8 +279,7 @@ else
     private string fileSearchQuery = "";
     private bool copyFeedback = false;
     private bool IsOwner => repo != null && string.Equals(currentUser, repo.Owner, StringComparison.Ordinal);
-    private bool IsSettingsRoute => Navigation.ToBaseRelativePath(Navigation.Uri).Equals($"{Owner}/{Name}/settings", StringComparison.OrdinalIgnoreCase);
-    private string tab => IsSettingsRoute ? "settings" : Tab ?? "files";
+    private string tab => Tab ?? "files";
 
     protected override async Task OnParametersSetAsync()
     {
@@ -404,6 +402,16 @@ else
 
         message = "Repository settings saved.";
         error = null;
+    }
+
+    private void NavigateToTab(string nextTab)
+    {
+        Navigation.NavigateTo($"/{Owner}/{Name}?tab={nextTab}");
+    }
+
+    private void NavigateToSettings()
+    {
+        Navigation.NavigateTo($"/{Owner}/{Name}?tab=settings");
     }
 
     private async Task LoadReadmeAsync()

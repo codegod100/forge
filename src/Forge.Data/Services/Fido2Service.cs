@@ -143,7 +143,7 @@ public class Fido2Service : IFido2Service
         });
         
         // Store options for verification
-        var key = Convert.ToBase64String(options.Challenge);
+        var key = Base64Url.Encode(options.Challenge);
         _pendingAssertions[key] = options;
         
         return Task.FromResult(options);
@@ -242,4 +242,13 @@ public class Fido2Service : IFido2Service
         
         return true;
     }
+}
+
+file static class Base64Url
+{
+    public static string Encode(byte[] bytes) =>
+        Convert.ToBase64String(bytes)
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
 }
