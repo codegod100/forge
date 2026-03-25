@@ -127,27 +127,25 @@ else
             return;
         }
 
-        var branches = await GitService.GetBranchesAsync(repository);
-        var branchExists = branches.Any(b => b.Name == Branch);
+        // Try to get tree - supports both branch names and commit SHAs
+        treeNodes = await GitService.GetTreeAsync(repository, Branch, Path);
 
-        if (!branchExists)
+        if (treeNodes == null)
         {
+            // Check if it's an empty repo or invalid ref
+            var branches = await GitService.GetBranchesAsync(repository);
             if (!branches.Any())
             {
                 error = "This repository is empty. Push some code to get started!";
             }
+            else if (!string.IsNullOrEmpty(Path))
+            {
+                error = $"Path '{Path}' not found";
+            }
             else
             {
                 var branchList = string.Join(", ", branches.Select(b => b.Name));
-                error = $"Branch '{Branch}' not found. Available branches: {branchList}";
-            }
-        }
-        else
-        {
-            treeNodes = await GitService.GetTreeAsync(repository, Branch, Path);
-            if (treeNodes == null && !string.IsNullOrEmpty(Path))
-            {
-                error = $"Path '{Path}' not found in this branch";
+                error = $"Ref '{Branch}' not found. Available branches: {branchList}";
             }
         }
         
