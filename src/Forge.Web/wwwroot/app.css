@@ -2,6 +2,37 @@
     box-sizing: border-box;
 }
 
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: #0d1117;
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #30363d;
+    border-radius: 5px;
+    border: 2px solid #0d1117;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #484f58;
+}
+
+::-webkit-scrollbar-corner {
+    background: #0d1117;
+}
+
+/* Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #30363d #0d1117;
+}
+
 /* Remove focus outline, use custom focus styles instead */
 :focus {
     outline: none;
