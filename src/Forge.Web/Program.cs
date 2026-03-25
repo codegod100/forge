@@ -197,12 +197,12 @@ app.MapPost("/auth/passkey/register/complete", async (
         var response = new Fido2NetLib.AuthenticatorAttestationRawResponse
         {
             Id = request.Id,
-            RawId = Base64Url.Decode(request.RawId),
+            RawId = Base64Url.Decode(request.rawId),
             Type = Fido2NetLib.Objects.PublicKeyCredentialType.PublicKey,
             Response = new Fido2NetLib.AuthenticatorAttestationRawResponse.AttestationResponse
             {
-                ClientDataJson = Base64Url.Decode(request.Response.ClientDataJSON),
-                AttestationObject = Base64Url.Decode(request.Response.AttestationObject),
+                ClientDataJson = Base64Url.Decode(request.Response.clientDataJSON),
+                AttestationObject = Base64Url.Decode(request.Response.attestationObject),
                 Transports = []
             },
             ClientExtensionResults = request.ClientExtensionResults ?? new Fido2NetLib.Objects.AuthenticationExtensionsClientOutputs()
@@ -235,14 +235,14 @@ app.MapPost("/auth/passkey/authenticate/complete", async (
         var response = new Fido2NetLib.AuthenticatorAssertionRawResponse
         {
             Id = request.Id,
-            RawId = Base64Url.Decode(request.RawId),
+            RawId = Base64Url.Decode(request.rawId),
             Type = Fido2NetLib.Objects.PublicKeyCredentialType.PublicKey,
             Response = new Fido2NetLib.AuthenticatorAssertionRawResponse.AssertionResponse
             {
-                ClientDataJson = Base64Url.Decode(request.Response.ClientDataJSON),
-                AuthenticatorData = Base64Url.Decode(request.Response.AuthenticatorData),
-                Signature = Base64Url.Decode(request.Response.Signature),
-                UserHandle = request.Response.UserHandle != null ? Base64Url.Decode(request.Response.UserHandle) : null
+                ClientDataJson = Base64Url.Decode(request.Response.clientDataJSON),
+                AuthenticatorData = Base64Url.Decode(request.Response.authenticatorData),
+                Signature = Base64Url.Decode(request.Response.signature),
+                UserHandle = request.Response.userHandle != null ? Base64Url.Decode(request.Response.userHandle) : null
             },
             ClientExtensionResults = request.ClientExtensionResults ?? new Fido2NetLib.Objects.AuthenticationExtensionsClientOutputs()
         };
@@ -320,28 +320,28 @@ app.Run();
 // DTOs for passkey requests
 public record PasskeyRegistrationRequest(
     string Id,
-    string RawId,
+    string rawId,
     string Type,
     PasskeyRegistrationResponse Response,
     string? DeviceName,
     Fido2NetLib.Objects.AuthenticationExtensionsClientOutputs? ClientExtensionResults);
 
 public record PasskeyRegistrationResponse(
-    string ClientDataJSON,
-    string AttestationObject);
+    string clientDataJSON,
+    string attestationObject);
 
 public record PasskeyAuthenticationRequest(
     string Id,
-    string RawId,
+    string rawId,
     string Type,
     PasskeyAuthenticationResponse Response,
     Fido2NetLib.Objects.AuthenticationExtensionsClientOutputs? ClientExtensionResults);
 
 public record PasskeyAuthenticationResponse(
-    string ClientDataJSON,
-    string AuthenticatorData,
-    string Signature,
-    string? UserHandle);
+    string clientDataJSON,
+    string authenticatorData,
+    string signature,
+    string? userHandle);
 
 file static class Base64Url
 {
