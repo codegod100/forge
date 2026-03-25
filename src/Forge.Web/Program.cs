@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using Fido2NetLib;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +20,12 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents(options => options.DetailedErrors = true);
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddHttpContextAccessor();
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedHost | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection(AuthOptions.SectionName));
 builder.Services.AddSingleton<IAuthService, ConfiguredAuthService>();
@@ -48,15 +55,24 @@ builder.Services.AddSingleton<IGitService>(sp => new GitService(reposRoot));
 builder.Services.AddScoped<IRepositoryService, RepositoryService>();
 
 // Configure Fido2
-var baseUrl = builder.Configuration["BaseUrl"] ?? "http://localhost:5128";
-var fido2Config = new Fido2Configuration
+builder.Services.AddScoped<IFido2>(sp =>
 {
-    ServerDomain = new Uri(baseUrl).Host,
-    ServerName = "Forge",
-    Origins = new HashSet<string> { baseUrl.TrimEnd('/') },
-    TimestampDriftTolerance = 300000
-};
-builder.Services.AddSingleton<IFido2>(sp => new Fido2NetLib.Fido2(fido2Config));
+    var httpContextAccessor = sp.GetRequiredService<IHttpContextAccessor>();
+    var configuration = sp.GetRequiredService<IConfiguration>();
+    var request = httpContextAccessor.HttpContext?.Request;
+    var origin = ResolveWebAuthnOrigin(request, configuration["BaseUrl"]);
+    var serverDomain = ResolveWebAuthnServerDomain(request, configuration["BaseUrl"]);
+
+    var fido2Config = new Fido2Configuration
+    {
+        ServerDomain = serverDomain,
+        ServerName = "Forge",
+        Origins = new HashSet<string> { origin },
+        TimestampDriftTolerance = 300000
+    };
+
+    return new Fido2NetLib.Fido2(fido2Config);
+});
 builder.Services.AddScoped<IFido2Service, Fido2Service>();
 
 // Git HTTP middleware
@@ -121,6 +137,7 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+app.UseForwardedHeaders();
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -331,6 +348,26 @@ app.MapMethods("/{owner}/{repo}.git/{**rest}", new[] { "GET", "POST" }, async (H
 });
 
 app.Run();
+
+static string ResolveWebAuthnOrigin(HttpRequest? request, string? configuredBaseUrl)
+{
+    if (request is not null && request.Host.HasValue)
+    {
+        return $"{request.Scheme}://{request.Host.Value}".TrimEnd('/');
+    }
+
+    return (configuredBaseUrl ?? "http://localhost:5128").TrimEnd('/');
+}
+
+static string ResolveWebAuthnServerDomain(HttpRequest? request, string? configuredBaseUrl)
+{
+    if (request is not null && request.Host.HasValue)
+    {
+        return request.Host.Host;
+    }
+
+    return new Uri(configuredBaseUrl ?? "http://localhost:5128").Host;
+}
 
 file static class Base64Url
 {
