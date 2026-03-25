@@ -296,7 +296,7 @@ a:hover {
 
 /* File Content */
 .file-content {
-    background: #161b22;
+    background: transparent;
     border: 1px solid #30363d;
     border-radius: 6px;
     padding: 1rem;
@@ -307,18 +307,84 @@ a:hover {
 }
 
 .file-content.syntax-pending {
-    opacity: 0.45;
-    transition: opacity 140ms ease;
+    opacity: 1;
+    transition: none;
 }
 
 .file-content.syntax-ready {
     opacity: 1;
-    transition: opacity 180ms ease;
+    transition: none;
 }
 
-.file-content code[class*="language-"],
-.file-content pre[class*="language-"] {
+pre.file-content,
+pre.file-content[class*="language-"],
+pre.file-content > code,
+pre.file-content > code[class*="language-"] {
     font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+    background: transparent !important;
+    background-color: transparent !important;
+    color: #c0caf5;
+    text-shadow: none !important;
+}
+
+pre.file-content > code .token.comment,
+pre.file-content > code .token.prolog,
+pre.file-content > code .token.doctype,
+pre.file-content > code .token.cdata {
+    color: #565f89;
+}
+
+pre.file-content > code .token.punctuation,
+pre.file-content > code .token.operator {
+    color: #89ddff;
+}
+
+pre.file-content > code .token.property,
+pre.file-content > code .token.tag,
+pre.file-content > code .token.constant,
+pre.file-content > code .token.symbol,
+pre.file-content > code .token.deleted {
+    color: #7aa2f7;
+}
+
+pre.file-content > code .token.boolean,
+pre.file-content > code .token.number {
+    color: #ff9e64;
+}
+
+pre.file-content > code .token.selector,
+pre.file-content > code .token.attr-name,
+pre.file-content > code .token.string,
+pre.file-content > code .token.char,
+pre.file-content > code .token.builtin,
+pre.file-content > code .token.inserted {
+    color: #9ece6a;
+}
+
+pre.file-content > code .token.atrule,
+pre.file-content > code .token.attr-value,
+pre.file-content > code .token.keyword {
+    color: #bb9af7;
+}
+
+pre.file-content > code .token.function,
+pre.file-content > code .token.class-name {
+    color: #7dcfff;
+}
+
+pre.file-content > code .token.regex,
+pre.file-content > code .token.important,
+pre.file-content > code .token.variable {
+    color: #f7768e;
+}
+
+pre.file-content > code .token.important,
+pre.file-content > code .token.bold {
+    font-weight: 600;
+}
+
+pre.file-content > code .token.italic {
+    font-style: italic;
 }
 
 .auth-card {

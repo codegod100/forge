@@ -226,7 +226,19 @@ else
 
     private static string GetLanguage(string? path)
     {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return "clike";
+        }
+
+        var fileName = System.IO.Path.GetFileName(path);
         var extension = System.IO.Path.GetExtension(path)?.ToLowerInvariant();
+
+        if (string.Equals(fileName, "Dockerfile", StringComparison.OrdinalIgnoreCase))
+        {
+            return "docker";
+        }
+
         return extension switch
         {
             ".cs" or ".csproj" => "csharp",
@@ -235,6 +247,7 @@ else
             ".css" => "css",
             ".html" or ".xml" or ".razor" or ".svg" => "markup",
             ".sh" or ".bash" => "bash",
+            ".yml" or ".yaml" => "yaml",
             ".md" => "markdown",
             _ => "clike"
         };

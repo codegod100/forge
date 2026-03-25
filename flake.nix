@@ -11,11 +11,27 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
         dotnet-sdk = pkgs.dotnetCorePackages.dotnet_9.sdk;
+        dotnet-runtime = pkgs.dotnetCorePackages.dotnet_9.runtime;
         flyctl = pkgs.flyctl;
+
+        forge = pkgs.buildDotnetModule rec {
+          name = "forge";
+          src = ./.;
+          projectFile = "src/Forge.Web/Forge.Web.csproj";
+          nugetDeps = ./deps.json;
+          dotnet-sdk = pkgs.dotnetCorePackages.dotnet_9.sdk;
+          dotnet-runtime = pkgs.dotnetCorePackages.dotnet_9.runtime;
+          executables = [ "Forge.Web" ];
+          
+          # Only build for linux-x64
+          runtimeId = "linux-x64";
+          buildType = "Release";
+          selfContainedBuild = false;
+        };
 
         runForge = pkgs.writeShellApplication {
           name = "run-forge";
-          runtimeInputs = [ dotnet-sdk ];
+          runtimeInputs = [ dotnet-runtime ];
           text = ''
             password_file="''${FORGE_ADMIN_PASSWORD_FILE:-''${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/agenix/forge-admin-password}"
             if [ ! -f "$password_file" ]; then
@@ -24,7 +40,7 @@
             fi
             export Auth__PasswordFile="$password_file"
             echo "Forge starting at: http://localhost:5128"
-            exec dotnet run --project src/Forge.Web "$@"
+            exec ${forge}/bin/Forge.Web --urls "http://localhost:5128" "$@"
           '';
         };
 
@@ -49,20 +65,8 @@
         };
       in
       {
-        packages.default = pkgs.buildDotnetModule {
-          pname = "forge";
-          version = "0.1.0";
-          src = ./.;
-
-          projectFile = "Forge.sln";
-          nugetDeps = ./deps.nix;
-
-          dotnet-sdk = dotnet-sdk;
-          dotnet-runtime = pkgs.dotnetCorePackages.dotnet_9.runtime;
-
-          executables = [ "Forge.Web" ];
-        };
-
+        packages.default = runForge;
+        packages.forge = forge;
         packages.run-forge = runForge;
         packages.deploy-fly = deployFly;
 
