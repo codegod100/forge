@@ -145,7 +145,16 @@
     {
         if (firstRender)
         {
-            webauthnAvailable = await JS.InvokeAsync<bool>("forge.webauthn.isAvailable");
+            try
+            {
+                webauthnAvailable = await JS.InvokeAsync<bool>("forge.webauthn.isAvailable");
+                Console.WriteLine($"[Settings] WebAuthn available: {webauthnAvailable}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Settings] Error checking WebAuthn: {ex.Message}");
+                webauthnAvailable = false;
+            }
             StateHasChanged();
         }
     }

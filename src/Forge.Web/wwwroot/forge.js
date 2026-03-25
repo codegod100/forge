@@ -160,10 +160,17 @@ window.forge.webauthn = {
   
   // Check if WebAuthn is available
   isAvailable: () => {
+    console.log('[WebAuthn] Checking availability...');
+    console.log('[WebAuthn] protocol:', window.location.protocol);
+    console.log('[WebAuthn] hostname:', window.location.hostname);
+    console.log('[WebAuthn] PublicKeyCredential:', typeof window.PublicKeyCredential);
+    
     // WebAuthn requires a secure context (HTTPS or localhost)
     const isSecure = window.location.protocol === 'https:' || 
                      window.location.hostname === 'localhost' || 
                      window.location.hostname === '127.0.0.1';
+    
+    console.log('[WebAuthn] isSecure:', isSecure);
     
     if (!isSecure) {
       console.log('[WebAuthn] Not available: requires HTTPS or localhost');
@@ -175,7 +182,7 @@ window.forge.webauthn = {
       return false;
     }
     
-    console.log('[WebAuthn] Available');
+    console.log('[WebAuthn] Available!');
     return true;
   },
   
